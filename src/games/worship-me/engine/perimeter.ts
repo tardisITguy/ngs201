@@ -1,0 +1,3 @@
+export const perimeterIds=['0,0','0,1','0,2','0,3','0,4','1,4','2,4','3,4','4,4','4,3','4,2','4,1','4,0','3,0','2,0','1,0'];
+export function templePositions(count:number){if(count<2||count>8)throw Error('Player count must be 2–8');if(count%2===0){const half=count/2;const first=Array.from({length:half},(_,i)=>Math.floor(i*8/half));return first.flatMap(i=>[perimeterIds[i],perimeterIds[i+8]])}return Array.from({length:count},(_,i)=>perimeterIds[Math.floor(i*16/count)]);}
+export function cyclicGaps(ids:string[]){const p=ids.map(x=>perimeterIds.indexOf(x)).sort((a,b)=>a-b);return p.map((x,i)=>(p[(i+1)%p.length]-x+16)%16)}

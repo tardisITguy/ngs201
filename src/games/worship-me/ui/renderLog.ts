@@ -1,0 +1,1 @@
+import type {GameState} from '../engine/types';export const renderLog=(s:GameState)=>`<section class="log"><h2>Event log</h2>${s.eventLog.slice(-12).reverse().map(x=>`<p>${x}</p>`).join('')}</section>`;

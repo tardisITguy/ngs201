@@ -1,0 +1,2 @@
+.game-setup{max-width:620px;margin:50px auto;padding:24px;background:#fff;border-radius:14px;display:grid;gap:16px}.game-setup label{display:flex;justify-content:space-between;align-items:center;gap:16px;margin:8px 0}.game-setup select,.game-setup input{min-width:220px}.ai-acting{font-weight:700;color:#087f8c}
+.cell .occupancy{position:absolute;right:4px;top:4px;padding:1px 4px;border-radius:8px;background:#fffbd9;color:#222;font-size:9px;font-weight:700;z-index:2}.cell .occupancy.at-capacity{background:#191919;color:#fff}.cell.full{box-shadow:inset 0 0 0 2px #111}

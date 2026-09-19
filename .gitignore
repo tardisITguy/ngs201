@@ -1,0 +1,22 @@
+node_modules/
+dist*/
+validation-results*/
+*.log
+*-probe*.json
+queued-smoke-results.json
+results.json
+simulation-results.json
+strategy-validation-*.json
+.env
+.env.*
+!.env.example
+# Test coverage
+coverage/
+
+# Supabase CLI local state
+supabase/.temp/
+
+# Windows / macOS filesystem noise
+Thumbs.db
+Desktop.ini
+.DS_Store
