@@ -102,6 +102,34 @@ reconnecting reuse the persisted order rather than randomizing again. Future
 trusted lobby commands may change `player_color` only while a room is in lobby;
 normal active-game commands must not alter color or turn order.
 
+### First trusted command: Create Room
+
+Room creation follows the platform trust boundary:
+
+```text
+Anonymous browser user
+        -> authenticated Supabase JWT
+        -> create-room Edge Function
+        -> validated caller identity and request
+        -> service-only create_room_server RPC
+        -> rooms + host room_players row + room_states
+        -> safe room metadata response
+```
+
+Anonymous Supabase users use the normal authenticated role. The browser reuses
+its persisted session and sends only game slug and display name; it cannot
+choose `host_user_id`, write platform tables, call the RPC, or read canonical
+state. The Edge Function validates the JWT, derives the host ID from that
+identity, and invokes the restricted atomic RPC through its server context.
+Room codes support discovery and invitation only; possession of a code is not
+authorization. Host membership and the server-only state row are created in
+the same transaction as the room.
+
+Color selection and random persisted turn order remain future trusted
+commands. Future mutations should use this same authenticated Edge Function to
+service-only atomic-command pattern and expose player-safe views/events rather
+than canonical `game_state`.
+
 The former development-only local Undo control has been removed. A future
 multiplayer undo policy, if desired, would require an explicit authorized
 server command and must never rewind canonical shared state client-side.

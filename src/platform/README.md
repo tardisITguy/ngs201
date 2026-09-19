@@ -41,3 +41,27 @@ that order, and activate the room. Reconnects reuse that persisted order.
 `src/platform/supabase/client.ts` may use only the public project URL and
 publishable key; privileged credentials belong only in the trusted server
 environment.
+
+## Trusted Create Room flow
+
+```text
+Anonymous browser user
+        -> authenticated JWT
+        -> create-room Edge Function
+        -> trusted identity and payload validation
+        -> service-only create_room_server RPC
+        -> rooms + host membership + room_states
+        -> safe room metadata
+```
+
+Anonymous users are authenticated Supabase users. The browser reuses its
+persisted anonymous session, supplies only a game slug and display name, and
+never writes tables directly. The Edge Function validates the caller JWT and
+derives `host_user_id`; request JSON cannot select the host. The atomic RPC is
+not executable by browser roles and returns no canonical state. A room code is
+for discovery, not authorization.
+
+The initial host has no color or turn order. Color selection, Ready, Start
+Game, and the one-time random persisted turn-order assignment are later
+trusted commands. Canonical `room_states.game_state` remains server-only and
+will eventually be transformed into player-safe views or events.

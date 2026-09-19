@@ -14,8 +14,9 @@ describe('Supabase platform foundation',()=>{
   const importers=sourceFiles(src).flatMap(file=>
    readFileSync(file,'utf8').includes('@supabase/supabase-js')?[file.pathname.replaceAll('\\','/')]:[]
   );
-  expect(importers).toHaveLength(1);
-  expect(importers[0]).toMatch(/\/src\/platform\/supabase\/client\.ts$/);
+  expect(importers).toHaveLength(3);
+  expect(importers.every(path=>path.includes('/src/platform/'))).toBe(true);
+  expect(importers.some(path=>path.endsWith('/src/platform/supabase/client.ts'))).toBe(true);
  });
 
  it('uses only browser-safe Supabase environment names in browser source',()=>{
@@ -77,5 +78,47 @@ describe('Supabase platform foundation',()=>{
   const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
   const sidebar=readFileSync(new URL('../src/games/worship-me/ui/renderSidebar.ts',import.meta.url),'utf8');
   expect(`${main}\n${sidebar}`).not.toMatch(/\bundo\b|data-command=["']undo["']/i);
+ });
+
+ it('defines create_room_server as a service-only atomic command',()=>{
+  const migration=readFileSync(new URL('../supabase/migrations/20260919190348_create_room_server_command.sql',import.meta.url),'utf8');
+  expect(migration).toContain('create function public.create_room_server');
+  expect(migration).toContain('security invoker');
+  expect(migration).toContain('set search_path = \'\'');
+  for(const role of ['public','anon','authenticated','service_role'])expect(migration).toContain(`revoke execute on function public.create_room_server(text, uuid, text) from ${role}`);
+  expect(migration).toContain('grant execute on function public.create_room_server(text, uuid, text) to service_role');
+  expect(migration).not.toMatch(/grant execute[^;]*to (?:anon|authenticated)/i);
+  expect(migration).toContain('insert into public.rooms');
+  expect(migration).toContain('insert into public.room_players');
+  expect(migration).toContain('insert into public.room_states');
+  const returnedColumns=migration.match(/returns table \(([\s\S]*?)\)\nlanguage/)?.[1]??'';
+  expect(returnedColumns).not.toContain('game_state');
+  expect(migration).toContain("ABCDEFGHJKLMNPQRSTUVWXYZ23456789");
+  expect(migration).toContain('for v_attempt in 1..10 loop');
+ });
+
+ it('keeps the create-room Edge Function authenticated and server authoritative',()=>{
+  const source=readFileSync(new URL('../supabase/functions/create-room/index.ts',import.meta.url),'utf8');
+  const config=readFileSync(new URL('../supabase/config.toml',import.meta.url),'utf8');
+  expect(config).toMatch(/\[functions\.create-room\][\s\S]*verify_jwt\s*=\s*true/);
+  expect(source).toContain("auth.getUser(token)");
+  expect(source).not.toContain('SUPABASE_ANON_KEY');
+  expect(source).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
+  expect(source).toContain("defaultNamedKey('SUPABASE_PUBLISHABLE_KEYS')");
+  expect(source).toContain("defaultNamedKey('SUPABASE_SECRET_KEYS')");
+  expect(source).toContain("serverClient.rpc('create_room_server'");
+  expect(source).not.toMatch(/['"](?:eyJ|sb_secret_|service_role[^'"]{8,})/i);
+  expect(source).not.toMatch(/payload\.(?:userId|hostUserId)|\{\s*(?:userId|hostUserId)\s*\}/);
+  expect(source).not.toContain('game_state');
+ });
+
+ it('enforces Edge Function slug limits and sanitizes RPC failures',()=>{
+  const source=readFileSync(new URL('../supabase/functions/create-room/index.ts',import.meta.url),'utf8');
+  expect(source).toContain('gameSlug.length<2');
+  expect(source).toContain('gameSlug.length>64');
+  expect(source).toContain("error.code==='22023'");
+  expect(source).toContain("response(400,{error:'Invalid room request'})");
+  expect(source).toContain("response(500,{error:'Unable to create room'})");
+  expect(source).not.toMatch(/response\([^\n]*(?:error\.message|error\.details|error\.hint|error\.stack)/);
  });
 });

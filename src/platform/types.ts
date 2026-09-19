@@ -36,3 +36,17 @@ export interface RoomPlayerRecord {
  joined_at:string;
  last_seen_at:string;
 }
+
+export interface CreateRoomRequest {
+ gameSlug:string;
+ displayName:string;
+}
+
+export interface CreateRoomResult {
+ room:{
+  id:string;
+  code:string;
+  gameId:string;
+  status:'lobby';
+ };
+}
