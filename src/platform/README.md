@@ -14,8 +14,32 @@ rooms, membership, persistence, and—later—chat, realtime transport, command
 authorization, and observability. This first foundation includes generic
 record types, a lazy Supabase browser client, and a local migration defining
 the registry, room, membership, and server-only canonical-state schema. The
-migration is not applied remotely and there are no room commands,
-subscriptions, or authentication UI yet.
+migration is not applied by the browser. NGS Play now includes identity, an
+active-games catalog, the existing trusted Create Room command, and a read-only
+lobby. Subscriptions and gameplay commands remain future work.
+
+## Player journey and hosting
+
+```text
+Squarespace: newgamestudios.com (public studio/marketing site)
+  -> PLAY
+Hostinger: play.newgamestudios.com (static NGS Play Vite app)
+  -> NGS identity -> Games -> Worship Me! -> Host
+  -> trusted Create Room -> Lobby
+  -> future trusted Start Game -> Worship Me! network game
+```
+
+GitHub remains source of truth. Supabase supplies Auth, database, Edge
+Functions, and future Realtime. `ngsllc-dev` is the current development
+backend. Until `ngsllc-prod` exists, `play.newgamestudios.com` is an unlinked
+development/test deployment.
+
+The browser routes are `/`, `/games`, `/games/worship-me`, and `/room/:code`.
+The `ngs.playerDisplayName` value is local UI/profile convenience only.
+Anonymous Supabase users are real authenticated users and Supabase identity is
+authoritative. Catalog and lobby reads use the normal browser client and
+existing RLS. Lobby reads access `rooms` and `room_players`, never
+`room_states`, whose canonical state remains server-only.
 
 Each game keeps its own state model, actions, validation, reducer, AI, and UI.
 There is deliberately no universal game reducer and no attempt to make Worship

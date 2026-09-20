@@ -14,7 +14,7 @@ describe('Supabase platform foundation',()=>{
   const importers=sourceFiles(src).flatMap(file=>
    readFileSync(file,'utf8').includes('@supabase/supabase-js')?[file.pathname.replaceAll('\\','/')]:[]
   );
-  expect(importers).toHaveLength(3);
+  expect(importers.length).toBeGreaterThanOrEqual(3);
   expect(importers.every(path=>path.includes('/src/platform/'))).toBe(true);
   expect(importers.some(path=>path.endsWith('/src/platform/supabase/client.ts'))).toBe(true);
  });

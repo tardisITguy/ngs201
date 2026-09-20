@@ -12,7 +12,7 @@ src/
     engine/                         deterministic rules and state transitions
     ai/                             bot policies and headless simulations
     ui/                             Worship Me! DOM rendering helpers
-  main.ts                           current browser application composition root
+  main.ts                           NGS Play browser composition root
 ```
 
 ## Worship Me! engine
@@ -40,9 +40,33 @@ helpers. Bots receive legal engine actions and submit their selected actions
 through the same reducer as human players. Headless simulation and diagnostic
 CLI code belong here, not in the engine.
 
+## NGS Play deployment and player journey
+
+```text
+Squarespace: newgamestudios.com (public studio and marketing site)
+  -> PLAY
+Hostinger: play.newgamestudios.com (static Vite application)
+  -> NGS identity -> Games -> Worship Me! -> Host
+  -> trusted Create Room command -> Lobby
+  -> future trusted Start Game command -> Worship Me! network game
+```
+
+GitHub remains the source of truth. Hostinger serves the compiled static app
+and its Apache History API fallback. Supabase provides Auth, Postgres, Edge
+Functions, and future Realtime. `ngsllc-dev` is currently the development
+backend; `play.newgamestudios.com` remains an unlinked development/test
+deployment until `ngsllc-prod` exists.
+
+The shell uses `/`, `/games`, `/games/worship-me`, and `/room/:code`.
+Anonymous Supabase users are real authenticated users. The local
+`ngs.playerDisplayName` is presentation convenience, never authorization.
+Catalog and lobby browser reads remain RLS-controlled, and canonical
+`public.room_states` stays server-only.
+
 ## Browser application and persistence
 
-`src/main.ts` is the browser composition root. It owns DOM event binding,
+`src/main.ts` is the browser composition root. The NGS Play shell owns the site
+root and precedes the game experience. The retained local game composition owns DOM event binding,
 `window.setTimeout`, file downloads/imports, and the current
 `localStorage` save/resume adapter. The UI renderers under
 `src/games/worship-me/ui` consume game state but do not define rules.
