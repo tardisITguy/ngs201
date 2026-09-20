@@ -144,11 +144,13 @@ begin
     or pg_catalog.jsonb_array_length(p_game_state->'turnOrder') <> v_player_count
     or p_game_state->>'phase' is distinct from 'placement'
     or p_game_state->'round' is distinct from '1'::jsonb
-    or case
-      when pg_catalog.jsonb_typeof(p_game_state->'currentPlayerIndex') = 'number'
-      then (p_game_state->>'currentPlayerIndex')::integer not between 0 and v_player_count - 1
-      else true
-    end
+    or (
+      case
+        when pg_catalog.jsonb_typeof(p_game_state->'currentPlayerIndex') = 'number'
+        then (p_game_state->>'currentPlayerIndex')::integer not between 0 and v_player_count - 1
+        else true
+      end
+    )
     or nullif(pg_catalog.btrim(p_game_state->>'seed'), '') is null
     or exists (
       select 1
