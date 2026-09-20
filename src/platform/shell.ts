@@ -4,7 +4,10 @@ import {createRouter,type Route} from './router';
 import {createHostAction} from './rooms/host';
 import {createJoinAction,normalizeRoomCode} from './rooms/joinRoom';
 import {createLeaveAction} from './rooms/leaveRoom';
+import {createSetPlayerColorAction,SetPlayerColorError} from './rooms/setPlayerColor';
 import {getLobby} from './rooms/lobby';
+import {WORSHIP_ME_PLAYER_COLORS,WORSHIP_ME_PLAYER_COLOR_HEX} from '../games/worship-me/ui/playerColors';
+import './colorSelection.css';
 
 const escapeHtml=(value:string)=>value.replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]!));
 const logo=()=>`<a class="brand" href="/" data-link aria-label="New Game Studios home"><img src="/brand/ngs/bannerlogo.png" alt="New Game Studios"><span>THE FUTURE IS NEW</span></a>`;
@@ -16,6 +19,7 @@ export function startPlayShell(root:HTMLDivElement){
  const host=createHostAction();
  const join=createJoinAction();
  const leave=createLeaveAction();
+ const setColor=createSetPlayerColorAction();
  let identityReturnPath:string|undefined;
  const router=createRouter(window,route=>void render(route));
  root.addEventListener('click',event=>{const link=(event.target as Element).closest<HTMLAnchorElement>('a[data-link]');if(link){event.preventDefault();router.navigate(new URL(link.href).pathname);}});
@@ -66,13 +70,16 @@ export function startPlayShell(root:HTMLDivElement){
   };
  }
 
- async function renderLobby(code:string){
+ async function renderLobby(code:string,colorNotice=''){
   root.innerHTML=page(`<section class="lobby"><div class="status-panel" role="status"><span class="spinner"></span> Loading room…</div></section>`,true);
   try{
    const lobby=await getLobby(code);
-   const players=lobby.players.map(player=>`<li><span class="ready-icon" aria-label="${player.isReady?'Ready':'Not ready'}">${player.isReady?'✓':'○'}</span><strong>${escapeHtml(player.displayName)}</strong>${player.playerColor?`<span class="color-label">${escapeHtml(player.playerColor)}</span>`:''}${player.isHost?'<span class="host-badge">HOST</span>':''}</li>`).join('');
+   const colorName=(color:string|null)=>color?color[0].toUpperCase()+color.slice(1):'No color';
+   const players=lobby.players.map(player=>`<li><span class="ready-icon" aria-label="${player.isReady?'Ready':'Not ready'}">${player.isReady?'✓':'○'}</span><strong>${escapeHtml(player.displayName)}</strong><span class="color-label">${escapeHtml(colorName(player.playerColor))}</span>${player.isHost?'<span class="host-badge">HOST</span>':''}</li>`).join('');
+   const currentPlayer=lobby.players.find(player=>player.isCurrentUser),currentColor=currentPlayer?.playerColor??null;
+   const colorButtons=WORSHIP_ME_PLAYER_COLORS.map(color=>{const occupied=lobby.players.some(player=>!player.isCurrentUser&&player.playerColor===color),selected=currentColor===color;return`<button type="button" data-player-color="${color}" style="--player-color:${WORSHIP_ME_PLAYER_COLOR_HEX[color]}" aria-label="${colorName(color)}${occupied?' — unavailable':selected?' — selected':''}" aria-pressed="${selected}" ${occupied?'disabled':''}><span aria-hidden="true"></span>${colorName(color)}${selected?' ✓':''}</button>`;}).join('');
    const hostHelp=lobby.room.isCurrentUserHost?'<p class="lede">If other players remain, host control passes to the longest-waiting player.</p>':'';
-   root.querySelector('.lobby')!.innerHTML=`<button class="secondary-button compact" data-leave>LEAVE LOBBY</button>${hostHelp}<p class="form-message" data-leave-message aria-live="polite"></p><section class="room-banner"><div><p class="eyebrow">ROOM · ${escapeHtml(lobby.room.status.toUpperCase())}</p><h1>${escapeHtml(lobby.room.code)}</h1></div><button class="secondary-button compact" data-copy>Copy code</button></section><section class="lobby-grid"><div class="panel"><div class="panel-title"><h2>Players</h2><button class="text-button" data-refresh>Refresh</button></div><ul class="player-list">${players||'<li>No players found.</li>'}</ul></div><div class="panel future-panel"><h2>Choose color</h2><div class="color-options"><button disabled>Red</button><button disabled>Blue</button><button disabled>Green</button><button disabled>Yellow</button></div><span class="coming">COMING NEXT</span></div><div class="panel chat-panel"><h2>Chat</h2><p>Chat will appear here in the next multiplayer step.</p><span class="coming">COMING NEXT</span></div><div class="lobby-actions"><button class="secondary-button" disabled>READY <small>COMING NEXT</small></button>${lobby.room.isCurrentUserHost?'<button class="primary-button" disabled>START GAME <small>COMING NEXT</small></button>':''}</div></section>`;
+   root.querySelector('.lobby')!.innerHTML=`<button class="secondary-button compact" data-leave>LEAVE LOBBY</button>${hostHelp}<p class="form-message" data-leave-message aria-live="polite"></p><section class="room-banner"><div><p class="eyebrow">ROOM · ${escapeHtml(lobby.room.status.toUpperCase())}</p><h1>${escapeHtml(lobby.room.code)}</h1></div><button class="secondary-button compact" data-copy>Copy code</button></section><section class="lobby-grid"><div class="panel"><div class="panel-title"><h2>Players</h2><button class="text-button" data-refresh>Refresh</button></div><ul class="player-list">${players||'<li>No players found.</li>'}</ul></div><div class="panel color-panel"><h2>Choose color</h2><div class="color-options">${colorButtons}</div><button class="text-button" type="button" data-clear-color ${currentColor?'':'disabled'}>Clear selection</button><p class="form-message" data-color-message aria-live="polite">${escapeHtml(colorNotice)}</p></div><div class="panel chat-panel"><h2>Chat</h2><p>Chat will appear here in the next multiplayer step.</p><span class="coming">COMING NEXT</span></div><div class="lobby-actions"><button class="secondary-button" disabled>READY <small>COMING NEXT</small></button>${lobby.room.isCurrentUserHost?'<button class="primary-button" disabled>START GAME <small>COMING NEXT</small></button>':''}</div></section>`;
    root.querySelector<HTMLButtonElement>('[data-refresh]')!.onclick=()=>void renderLobby(code);
    const copy=root.querySelector<HTMLButtonElement>('[data-copy]')!;
    copy.onclick=async()=>{try{await navigator.clipboard.writeText(lobby.room.code);copy.textContent='Copied!';}catch{copy.textContent='Copy unavailable';}};
@@ -84,6 +91,14 @@ export function startPlayShell(root:HTMLDivElement){
     catch{leaveMessage.textContent='We could not leave the lobby. Please try again.';}
     finally{if(document.body.contains(leaveButton)){leaveButton.disabled=false;leaveButton.textContent='LEAVE LOBBY';}}
    };
+   const colorControls=[...root.querySelectorAll<HTMLButtonElement>('[data-player-color], [data-clear-color]')],colorMessage=root.querySelector<HTMLElement>('[data-color-message]')!;
+   const chooseColor=async(playerColor:string|null)=>{
+    colorControls.forEach(control=>control.disabled=true);colorMessage.textContent='Updating color...';
+    try{await setColor({roomCode:lobby.room.code,playerColor});await renderLobby(code);}
+    catch(error){const message=error instanceof SetPlayerColorError?error.message:'Unable to update player color.';await renderLobby(code,message);}
+   };
+   root.querySelectorAll<HTMLButtonElement>('[data-player-color]').forEach(control=>control.onclick=()=>void chooseColor(control.dataset.playerColor!));
+   root.querySelector<HTMLButtonElement>('[data-clear-color]')!.onclick=()=>void chooseColor(null);
   }catch(error){const message=error instanceof Error?error.message:"You don't have access to this room.";root.querySelector('.lobby')!.innerHTML=`<section class="status-panel error"><h1>Room unavailable</h1><p>${escapeHtml(message)}</p><a class="text-link" href="/games" data-link>Back to Games</a></section>`;}
  }
  router.start();

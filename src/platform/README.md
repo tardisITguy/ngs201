@@ -141,3 +141,24 @@ authoritative lifecycle operations. Stale membership is cleaned up by the
 next trusted Create or Join; the in-app lobby control explicitly calls Leave.
 Realtime remains deferred, so remaining users may need **Refresh Players** to
 see host transfer.
+
+## Trusted player-color selection
+
+```text
+Browser -> set-player-color Edge Function -> verified JWT
+        -> service-only set_player_color_server -> room lock
+        -> game-color metadata validation -> unique assignment
+```
+
+Supported colors are stored per game in `public.game_player_colors`; browser
+constants are presentation only. The command locks the lobby room before
+checking membership or availability, and the existing partial unique index on
+`(room_id, player_color)` remains defense in depth. Browser availability can
+be stale without Realtime: a losing same-color race receives a safe conflict
+and refreshes the lobby. Other players use **Refresh Players**.
+
+Changing or clearing a color resets that player's future Ready state to false.
+Selecting the same color is idempotent and does not reset Ready. Leaving a
+lobby releases the color automatically because the membership row is removed.
+The next Start Game milestone must require every participating player to have
+a valid unique color; Start and Ready remain unimplemented here.

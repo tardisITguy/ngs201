@@ -1,0 +1,5 @@
+.color-panel .color-options{margin-bottom:16px}
+.color-options button{display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+.color-options button span{width:18px;height:18px;border:2px solid #ffffff66;border-radius:50%;background:var(--player-color);box-shadow:0 2px 8px #0008}
+.color-options button[aria-pressed="true"]{border-color:var(--ngs-yellow);box-shadow:0 0 0 2px #dfbb3d55}
+.color-options button:disabled:not([aria-pressed="true"]){cursor:not-allowed;opacity:.42}

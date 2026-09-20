@@ -72,3 +72,6 @@ export interface LeaveRoomRequest {roomCode:string}
 export interface LeaveRoomResult {
  completed:true;
 }
+
+export interface SetPlayerColorRequest {roomCode:string;playerColor:string|null}
+export interface SetPlayerColorResult {roomCode:string;playerColor:string|null;changed:boolean}

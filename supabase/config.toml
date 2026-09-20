@@ -6,3 +6,6 @@ verify_jwt = true
 
 [functions.leave-room]
 verify_jwt = true
+
+[functions.set-player-color]
+verify_jwt = true

@@ -214,6 +214,28 @@ host transfer.
 
 ## Game-specific responsibilities
 
+### Trusted player-color command
+
+```text
+Browser -> set-player-color Edge Function -> verified JWT
+        -> service-only set_player_color_server -> locked lobby room
+        -> server game-color validation -> unique room assignment
+```
+
+`public.game_player_colors` is the reusable, server-authoritative catalog of
+colors supported by each game. Worship Me! seeds its existing eight engine
+colors. Browser constants and lobby reads are presentation hints, not
+authority. The RPC locks the room before checking membership and availability;
+the existing partial unique `(room_id, player_color)` index is final
+race-safety defense. A stale client losing a color race receives a safe
+conflict and refreshes the lobby. Realtime remains deferred.
+
+Actual color changes and clearing reset `is_ready` to false. Selecting the
+already-owned color is idempotent and preserves readiness. Leaving deletes the
+membership and releases its color. Ready and Start Game remain future trusted
+commands; Start Game will require every participating player to hold a valid
+unique game color.
+
 Worship Me! retains its own rules contract, state schema, actions, validation,
 resolution queue, production and victory behavior, save schema, AI strategies,
 art assets, and UI. Future games should add sibling modules rather than extend

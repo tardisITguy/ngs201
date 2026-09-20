@@ -69,6 +69,7 @@ describe('Lobby lifecycle migration',()=>{
    '20260919190348_create_room_server_command.sql',
    '20260920000000_join_room_server_command.sql',
    '20260920000001_lobby_lifecycle.sql',
+   '20260920000002_player_color_selection.sql',
   ]);
  });
 
