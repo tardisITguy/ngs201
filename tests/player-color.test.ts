@@ -47,7 +47,7 @@ describe('Set Player Color browser client',()=>{
 });
 
 describe('player color migration and RPC',()=>{
- it('adds exactly one new migration',()=>{const names=readdirSync(new URL('../supabase/migrations/',import.meta.url),{withFileTypes:true}).filter(entry=>!entry.isDirectory()&&entry.name.endsWith('.sql')).map(entry=>entry.name).sort();expect(names.at(-1)).toBe('20260920000002_player_color_selection.sql');expect(names).toHaveLength(6);});
+ it('retains the player-color migration in history',()=>{const names=readdirSync(new URL('../supabase/migrations/',import.meta.url),{withFileTypes:true}).filter(entry=>!entry.isDirectory()&&entry.name.endsWith('.sql')).map(entry=>entry.name).sort();expect(names).toContain('20260920000002_player_color_selection.sql');expect(names).toHaveLength(7);});
 
  it('creates server-only normalized game color metadata seeded with exact colors',()=>{
   expect(migration).toContain('create table public.game_player_colors');
@@ -126,12 +126,12 @@ describe('Set Player Color Edge Function and lobby UI',()=>{
 
  it('removes the separate color panel and keeps the trusted refresh flow',()=>{
   expect(shell).not.toContain('Choose color');expect(shell).not.toContain('color-panel');expect(shell).not.toContain('data-clear-color');
-  expect(shell).toContain('data-player-color-select');expect(shell).toContain('data-color-message');
+  expect(shell).toContain('data-player-color-select');expect(shell).toContain('data-lobby-message');
   expect(shell).toContain('await setColor({roomCode:lobby.room.code,playerColor})');
   expect(shell).toContain('await renderLobby(code)');
   expect(shell).toContain('await renderLobby(code,message)');
   expect(shell).toContain('colorControl.disabled=true');
  });
 
- it('keeps Ready and Start Game unimplemented',()=>{expect(shell).toContain('READY <small>COMING NEXT</small>');expect(shell).toContain('START GAME <small>COMING NEXT</small>');});
+ it('keeps Start Game unimplemented',()=>{expect(shell).toContain('START GAME');expect(shell).toMatch(/disabled>START GAME/);});
 });

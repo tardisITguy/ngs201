@@ -160,5 +160,23 @@ and refreshes the lobby. Other players use **Refresh Players**.
 Changing or clearing a color resets that player's future Ready state to false.
 Selecting the same color is idempotent and does not reset Ready. Leaving a
 lobby releases the color automatically because the membership row is removed.
-The next Start Game milestone must require every participating player to have
-a valid unique color; Start and Ready remain unimplemented here.
+
+## Trusted Ready state
+
+```text
+Browser -> set-player-ready Edge Function -> verified JWT
+        -> service-only set_player_ready_server -> room lock
+        -> member/color validation -> is_ready mutation
+```
+
+Ready is authoritative server state. Ready=true requires a valid selected game
+color; Ready=false does not. Same-state commands are idempotent. The Ready and
+color RPCs serialize on the same room row, and color changes or clears reset
+Ready while selecting the same color preserves it. The browser sends only room
+code and the desired boolean, never user identity or color authority.
+
+Realtime remains deferred, so another member may need **Refresh Players** to
+see the change. Start Game is still unimplemented. The disabled host preview is
+advisory only and uses the current lobby read plus Worship Me!'s authoritative
+engine minimum of two players; a future trusted Start command must perform its
+own locked validation before assigning turn order or creating canonical state.

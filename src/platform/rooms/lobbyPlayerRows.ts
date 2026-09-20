@@ -27,5 +27,5 @@ function readonlyPlayerColor(color:string|null){
 
 export function renderLobbyPlayerRows(players:LobbyPlayer[]):string{
  const occupiedColors=new Set(players.filter(player=>!player.isCurrentUser&&player.playerColor).map(player=>player.playerColor!));
- return players.map(player=>`<li data-player-row="${escapeHtml(player.userId)}" ${player.isCurrentUser?'data-current-player':''}><span class="ready-icon" aria-label="${player.isReady?'Ready':'Not ready'}">${player.isReady?'✓':'○'}</span><strong class="player-name">${escapeHtml(player.displayName)}</strong><span class="player-row-meta">${player.isHost?'<span class="host-badge">HOST</span>':''}${player.isCurrentUser?currentPlayerColorControl(player,occupiedColors):readonlyPlayerColor(player.playerColor)}</span></li>`).join('');
+ return players.map(player=>`<li data-player-row="${escapeHtml(player.userId)}" ${player.isCurrentUser?'data-current-player':''}><strong class="player-name">${escapeHtml(player.displayName)}</strong><span class="player-row-meta">${player.isHost?'<span class="host-badge">HOST</span>':''}${player.isCurrentUser?currentPlayerColorControl(player,occupiedColors):readonlyPlayerColor(player.playerColor)}<span class="ready-badge ${player.isReady?'is-ready':'is-not-ready'}">${player.isReady?'READY':'NOT READY'}</span></span></li>`).join('');
 }

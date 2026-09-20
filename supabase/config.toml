@@ -9,3 +9,6 @@ verify_jwt = true
 
 [functions.set-player-color]
 verify_jwt = true
+
+[functions.set-player-ready]
+verify_jwt = true

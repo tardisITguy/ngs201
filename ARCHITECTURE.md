@@ -232,9 +232,29 @@ conflict and refreshes the lobby. Realtime remains deferred.
 
 Actual color changes and clearing reset `is_ready` to false. Selecting the
 already-owned color is idempotent and preserves readiness. Leaving deletes the
-membership and releases its color. Ready and Start Game remain future trusted
-commands; Start Game will require every participating player to hold a valid
-unique game color.
+membership and releases its color.
+
+### Trusted Ready command
+
+```text
+Browser -> set-player-ready Edge Function -> verified JWT
+        -> service-only set_player_ready_server -> locked lobby room
+        -> membership and supported-color validation -> is_ready update
+```
+
+Ready is server-authoritative and changes only the authenticated member's
+`is_ready` value. Becoming Ready requires a currently selected color that is
+still present in the game's server color catalog; becoming Not Ready never
+requires a color. Same-state requests are idempotent. Ready and color commands
+lock the same room row, so a concurrent color change/clear cannot commit a
+ready player without a color. Actual color changes and clears continue to reset
+Ready, while same-color selection preserves it.
+
+Realtime remains deferred, so other players use **Refresh Players** to observe
+Ready changes. Start Game remains unimplemented. Its lobby display is only an
+advisory preview based on the current read model and Worship Me!'s engine
+minimum of two players; the future trusted Start command must revalidate all
+eligibility server-side before creating canonical state.
 
 Worship Me! retains its own rules contract, state schema, actions, validation,
 resolution queue, production and victory behavior, save schema, AI strategies,
