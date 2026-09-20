@@ -3,6 +3,7 @@ import {describe,expect,it,vi} from 'vitest';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import {createSetPlayerColorAction,setPlayerColor,SetPlayerColorError} from '../src/platform/rooms/setPlayerColor';
 import {WORSHIP_ME_PLAYER_COLORS} from '../src/games/worship-me/ui/playerColors';
+import {renderLobbyPlayerRows} from '../src/platform/rooms/lobbyPlayerRows';
 
 const migration=readFileSync(new URL('../supabase/migrations/20260920000002_player_color_selection.sql',import.meta.url),'utf8');
 const core=readFileSync(new URL('../supabase/migrations/20260919190346_create_ngsllc_core.sql',import.meta.url),'utf8');
@@ -107,12 +108,29 @@ describe('Set Player Color Edge Function and lobby UI',()=>{
   expect(edge).toContain("response(500,{error:'Unable to update player color'})");
  });
 
- it('renders all colors, current selection, occupied state, clear, refresh, and readable player color labels',()=>{
-  expect(shell).toContain('WORSHIP_ME_PLAYER_COLORS.map');expect(shell).toContain('aria-pressed');expect(shell).toContain("occupied?'disabled':''");
-  expect(shell).toContain('data-clear-color');expect(shell).toContain('No color');expect(shell).toContain('data-color-message');
+ it('places the only interactive selector on the current player row',()=>{
+  const rows=renderLobbyPlayerRows([
+   {userId:'alice',displayName:'Alice',playerColor:'red',turnOrder:null,isReady:false,isHost:true,isCurrentUser:true},
+   {userId:'bob',displayName:'Bob',playerColor:'blue',turnOrder:null,isReady:false,isHost:false,isCurrentUser:false},
+   {userId:'carol',displayName:'Carol',playerColor:null,turnOrder:null,isReady:false,isHost:false,isCurrentUser:false},
+  ]);
+  expect(rows.match(/data-player-color-select/g)).toHaveLength(1);
+  expect(rows).toMatch(/data-player-row="alice" data-current-player[\s\S]*?<select data-player-color-select/);
+  expect(rows).toMatch(/data-player-row="bob" [\s\S]*?player-color-readonly[\s\S]*?>Blue</);
+  expect(rows).toMatch(/data-player-row="carol" [\s\S]*?player-color-readonly[\s\S]*?>No color</);
+  expect(rows).toMatch(/<option value="red" selected(?![^>]*disabled)/);
+  expect(rows).toMatch(/<option value="blue"\s+disabled>Blue — unavailable<\/option>/);
+  expect(rows).toContain('<option value="" >No color</option>');
+  expect(rows).not.toMatch(/data-player-row="bob"[^]*?data-player-color-select[^]*?data-player-row="carol"/);
+ });
+
+ it('removes the separate color panel and keeps the trusted refresh flow',()=>{
+  expect(shell).not.toContain('Choose color');expect(shell).not.toContain('color-panel');expect(shell).not.toContain('data-clear-color');
+  expect(shell).toContain('data-player-color-select');expect(shell).toContain('data-color-message');
   expect(shell).toContain('await setColor({roomCode:lobby.room.code,playerColor})');
   expect(shell).toContain('await renderLobby(code)');
   expect(shell).toContain('await renderLobby(code,message)');
+  expect(shell).toContain('colorControl.disabled=true');
  });
 
  it('keeps Ready and Start Game unimplemented',()=>{expect(shell).toContain('READY <small>COMING NEXT</small>');expect(shell).toContain('START GAME <small>COMING NEXT</small>');});
