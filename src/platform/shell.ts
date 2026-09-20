@@ -6,6 +6,7 @@ import {createJoinAction,normalizeRoomCode} from './rooms/joinRoom';
 import {createLeaveAction} from './rooms/leaveRoom';
 import {createSetPlayerColorAction,SetPlayerColorError} from './rooms/setPlayerColor';
 import {createSetPlayerReadyAction,SetPlayerReadyError} from './rooms/setPlayerReady';
+import {createStartGameAction,StartGameError} from './rooms/startGame';
 import {getLobby} from './rooms/lobby';
 import {renderLobbyPlayerRows} from './rooms/lobbyPlayerRows';
 import {defaultConfig} from '../games/worship-me/engine/config';
@@ -24,6 +25,7 @@ export function startPlayShell(root:HTMLDivElement){
  const leave=createLeaveAction();
  const setColor=createSetPlayerColorAction();
  const setReady=createSetPlayerReadyAction();
+ const start=createStartGameAction();
  let identityReturnPath:string|undefined;
  const router=createRouter(window,route=>void render(route));
  root.addEventListener('click',event=>{const link=(event.target as Element).closest<HTMLAnchorElement>('a[data-link]');if(link){event.preventDefault();router.navigate(new URL(link.href).pathname);}});
@@ -78,13 +80,20 @@ export function startPlayShell(root:HTMLDivElement){
   root.innerHTML=page(`<section class="lobby"><div class="status-panel" role="status"><span class="spinner"></span> Loading room…</div></section>`,true);
   try{
    const lobby=await getLobby(code);
+   if(lobby.room.status==='active'){
+    const ordered=[...lobby.players].sort((a,b)=>(a.turnOrder??Number.MAX_SAFE_INTEGER)-(b.turnOrder??Number.MAX_SAFE_INTEGER));
+    const activePlayers=ordered.map((player,index)=>`<li><strong>${index+1}. ${escapeHtml(player.displayName)}</strong><span>${escapeHtml(player.playerColor?player.playerColor[0].toUpperCase()+player.playerColor.slice(1):'No color')}</span></li>`).join('');
+    root.querySelector('.lobby')!.innerHTML=`<section class="panel active-game-placeholder"><p class="eyebrow">WORSHIP ME!</p><h1>GAME STARTED</h1><p class="lede">Room ${escapeHtml(lobby.room.code)}</p><h2>Players</h2><ol class="active-player-list">${activePlayers}</ol><p>Canonical game state has been initialized.</p><p class="coming">Gameplay synchronization is coming next.</p></section>`;
+    return;
+   }
    const players=renderLobbyPlayerRows(lobby.players);
    const currentPlayer=lobby.players.find(player=>player.isCurrentUser),canReady=WORSHIP_ME_PLAYER_COLORS.includes(currentPlayer?.playerColor as (typeof WORSHIP_ME_PLAYER_COLORS)[number]),readyLabel=currentPlayer?.isReady?'NOT READY':'READY';
    const allReadyPreview=lobby.players.length>=defaultConfig.playerMin&&lobby.players.every(player=>player.isReady&&WORSHIP_ME_PLAYER_COLORS.includes(player.playerColor as (typeof WORSHIP_ME_PLAYER_COLORS)[number]));
    const hostHelp=lobby.room.isCurrentUserHost?'<p class="lobby-controls__help">If other players remain, host control passes to the longest-waiting player.</p>':'';
-   const startGame=lobby.room.isCurrentUserHost?`<button class="primary-button compact" type="button" disabled>START GAME <small>${allReadyPreview?'READY TO START · COMING NEXT':'WAITING FOR ALL PLAYERS'}</small></button>`:'';
+   const nameRoom=lobby.room.isCurrentUserHost?'<button class="secondary-button compact future-control" type="button" disabled aria-describedby="name-room-status">Name Room <small id="name-room-status">COMING NEXT</small></button>':'';
+   const startGame=lobby.room.isCurrentUserHost?`<button class="primary-button compact" type="button" data-start ${allReadyPreview?'':'disabled'}>START GAME <small>${allReadyPreview?'':'WAITING FOR ALL PLAYERS'}</small></button>`:'';
    const readyHelp=!currentPlayer?.isReady&&!canReady?'<span class="ready-help" id="ready-help">Choose a color first</span>':'';
-   root.querySelector('.lobby')!.innerHTML=`<section class="lobby-controls" aria-labelledby="lobby-controls-heading"><h1 id="lobby-controls-heading">LOBBY CONTROLS</h1><div class="lobby-controls__bar"><div class="lobby-controls__room"><span class="lobby-controls__label">ROOM</span><strong class="lobby-controls__code">${escapeHtml(lobby.room.code)}</strong><button class="secondary-button compact" type="button" data-copy>Copy Code</button><button class="secondary-button compact future-control" type="button" disabled aria-describedby="name-room-status">Name Room <small id="name-room-status">COMING NEXT</small></button></div><div class="lobby-controls__actions"><button class="secondary-button compact" type="button" data-leave>LEAVE LOBBY</button><span class="ready-control"><button class="secondary-button compact" type="button" data-ready ${!currentPlayer||(!currentPlayer.isReady&&!canReady)?'disabled':''} ${readyHelp?'aria-describedby="ready-help"':''}>${readyLabel}</button>${readyHelp}</span>${startGame}</div></div>${hostHelp}<div class="lobby-controls__messages"><p class="form-message" data-lobby-message aria-live="polite">${escapeHtml(lobbyNotice)}</p><p class="form-message" data-leave-message aria-live="polite"></p></div></section><section class="lobby-content-grid"><div class="panel players-panel"><div class="panel-title"><h2>PLAYERS</h2><button class="text-button" data-refresh>Refresh</button></div><ul class="player-list">${players||'<li>No players found.</li>'}</ul></div><div class="panel chat-panel"><h2>CHAT</h2><div class="chat-panel__placeholder"><p>Chat will appear here in the next multiplayer step.</p><span class="coming">COMING NEXT</span></div></div></section>`;
+   root.querySelector('.lobby')!.innerHTML=`<section class="lobby-controls" aria-labelledby="lobby-controls-heading"><h1 id="lobby-controls-heading">LOBBY CONTROLS</h1><div class="lobby-controls__bar"><div class="lobby-controls__room"><span class="lobby-controls__label">ROOM</span><strong class="lobby-controls__code">${escapeHtml(lobby.room.code)}</strong><button class="secondary-button compact" type="button" data-copy>Copy Code</button>${nameRoom}</div><div class="lobby-controls__actions"><button class="secondary-button compact" type="button" data-leave>LEAVE LOBBY</button><span class="ready-control"><button class="secondary-button compact" type="button" data-ready ${!currentPlayer||(!currentPlayer.isReady&&!canReady)?'disabled':''} ${readyHelp?'aria-describedby="ready-help"':''}>${readyLabel}</button>${readyHelp}</span>${startGame}</div></div>${hostHelp}<div class="lobby-controls__messages"><p class="form-message" data-lobby-message aria-live="polite">${escapeHtml(lobbyNotice)}</p><p class="form-message" data-leave-message aria-live="polite"></p></div></section><section class="lobby-content-grid"><div class="panel players-panel"><div class="panel-title"><h2>PLAYERS</h2><button class="text-button" data-refresh>Refresh</button></div><ul class="player-list">${players||'<li>No players found.</li>'}</ul></div><div class="panel chat-panel"><h2>CHAT</h2><div class="chat-panel__placeholder"><p>Chat will appear here in the next multiplayer step.</p><span class="coming">COMING NEXT</span></div></div></section>`;
    root.querySelector<HTMLButtonElement>('[data-refresh]')!.onclick=()=>void renderLobby(code);
    const copy=root.querySelector<HTMLButtonElement>('[data-copy]')!;
    copy.onclick=async()=>{try{await navigator.clipboard.writeText(lobby.room.code);copy.textContent='Copied!';}catch{copy.textContent='Copy unavailable';}};
@@ -107,6 +116,12 @@ export function startPlayShell(root:HTMLDivElement){
     readyButton.disabled=true;readyButton.textContent='UPDATING…';lobbyMessage.textContent='Updating Ready state...';
     try{await setReady({roomCode:lobby.room.code,isReady:!currentPlayer.isReady});await renderLobby(code);}
     catch(error){const message=error instanceof SetPlayerReadyError?error.message:'Unable to update Ready state.';await renderLobby(code,message);}
+   };
+   const startButton=root.querySelector<HTMLButtonElement>('[data-start]');
+   if(startButton)startButton.onclick=async()=>{
+    startButton.disabled=true;startButton.textContent='STARTING GAME…';lobbyMessage.textContent='Starting game...';
+    try{await start({roomCode:lobby.room.code});await renderLobby(code);}
+    catch(error){const message=error instanceof StartGameError?error.message:'Unable to start game.';await renderLobby(code,message);}
    };
   }catch(error){const message=error instanceof Error?error.message:"You don't have access to this room.";root.querySelector('.lobby')!.innerHTML=`<section class="status-panel error"><h1>Room unavailable</h1><p>${escapeHtml(message)}</p><a class="text-link" href="/games" data-link>Back to Games</a></section>`;}
  }

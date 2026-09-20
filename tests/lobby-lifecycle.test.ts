@@ -71,6 +71,7 @@ describe('Lobby lifecycle migration',()=>{
    '20260920000001_lobby_lifecycle.sql',
    '20260920000002_player_color_selection.sql',
    '20260920000003_player_ready_state.sql',
+   '20260920000004_start_game.sql',
   ]);
  });
 

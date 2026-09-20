@@ -1,6 +1,6 @@
-import {countNeutralsInPlay} from './neutrals';
-import {followerTotal,followersInOwnTemple} from './victory';
-import type {AIDecisionDiagnostics,Cell,GameHistory,GameState,HistoryEvent,HistoryEventType,PlacementAction} from './types';
+import {countNeutralsInPlay} from './neutrals.ts';
+import {followerTotal,followersInOwnTemple} from './victory.ts';
+import type {AIDecisionDiagnostics,Cell,GameHistory,GameState,HistoryEvent,HistoryEventType,PlacementAction} from './types.ts';
 export const RULES_VERSION='directed-bless-edge-v3';
 export function createHistory(direction:1|-1,firstPlayerId:string,startedAt=new Date().toISOString()):GameHistory{return{rulesVersion:RULES_VERSION,startedAt,initialDirection:direction,initialFirstPlayerId:firstPlayerId,nextOrdinal:1,events:[]}}
 export function cellHistory(cell:Cell){return{id:cell.id,type:cell.visibleKind,hiddenType:cell.hiddenKind,occupants:{villagers:[...cell.villagers],priests:[...cell.priests]},wheat:cell.wheat,bread:cell.bread,modifier:cell.tileModifier?{...cell.tileModifier}:undefined}}

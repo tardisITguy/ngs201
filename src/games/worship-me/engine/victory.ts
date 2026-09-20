@@ -1,4 +1,4 @@
-import type {GameState,Player,VictoryResult} from './types';
+import type {GameState,Player,VictoryResult} from './types.ts';
 
 export function followerTotal(s:GameState,p:Player){return s.board.reduce((n,c)=>n+c.villagers.filter(v=>v===p.color).length+c.priests.filter(v=>v===p.color).length,0)}
 export function followersInOwnTemple(s:GameState,p:Player){const c=s.board.find(c=>c.id===p.templeCellId)!;return c.villagers.filter(v=>v===p.color).length+c.priests.filter(v=>v===p.color).length}

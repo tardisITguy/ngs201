@@ -176,7 +176,26 @@ Ready while selecting the same color preserves it. The browser sends only room
 code and the desired boolean, never user identity or color authority.
 
 Realtime remains deferred, so another member may need **Refresh Players** to
-see the change. Start Game is still unimplemented. The disabled host preview is
-advisory only and uses the current lobby read plus Worship Me!'s authoritative
-engine minimum of two players; a future trusted Start command must perform its
-own locked validation before assigning turn order or creating canonical state.
+see the change. The host's local Start eligibility preview uses the current
+lobby read plus Worship Me!'s authoritative engine minimum of two players, but
+the trusted Start command performs its own locked validation.
+
+## Trusted Start Game
+
+```text
+Browser { roomCode } -> start-game Edge Function -> verified JWT
+  -> privileged roster snapshot + server seed -> existing createGame()
+  -> service-only start_game_server -> locked snapshot revalidation
+  -> turn_order assignment + room_states version 1 + room active
+```
+
+The browser supplies no roster, colors, readiness, seed, order, or GameState.
+The Start RPC locks the room and atomically validates host, active game, player
+limits, Ready/color state, empty canonical state, and the exact stable roster.
+Stale candidates fail without partial writes, and an initialized room cannot be
+started again. `room_states` retains no browser read policy or grant.
+
+Stable lobby ordering is `joined_at`, then `user_id`; `turn_order 0` maps to
+engine `p1`, `1` to `p2`, and so forth. Name Room and Start Game render only for
+the host. Active gameplay synchronization is deferred, so the active room view
+is a player-safe placeholder and never reads or recreates canonical state.

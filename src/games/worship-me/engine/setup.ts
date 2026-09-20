@@ -1,10 +1,10 @@
-import {defaultConfig} from './config';
-import {hashSeed,next,shuffle} from './rng';
-import {cellId} from './board';
-import {templePositions} from './perimeter';
-import {MAX_NEUTRALS_IN_PLAY} from './neutrals';
-import {createHistory} from './history';
-import type {BotStrategy,Cell,ControlType,GameConfig,GameState,PlayerColor,ProductionKind} from './types';
+import {defaultConfig} from './config.ts';
+import {hashSeed,next,shuffle} from './rng.ts';
+import {cellId} from './board.ts';
+import {templePositions} from './perimeter.ts';
+import {MAX_NEUTRALS_IN_PLAY} from './neutrals.ts';
+import {createHistory} from './history.ts';
+import type {BotStrategy,Cell,ControlType,GameConfig,GameState,PlayerColor,ProductionKind} from './types.ts';
 
 const colors:PlayerColor[]=['red','purple','blue','cyan','green','yellow','orange','black'];
 export interface PlayerSetup{name:string;color?:PlayerColor;control?:ControlType;botStrategy?:BotStrategy}

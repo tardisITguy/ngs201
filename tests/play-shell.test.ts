@@ -43,7 +43,7 @@ describe('compact lobby presentation',()=>{
   expect(controls).toContain('lobby-controls__actions');
   expect(controls).toContain('data-copy');
   expect(controls).toContain('data-leave');
-  expect(controls).toContain('Name Room');
+  expect(shellSource).toContain('Name Room');
   expect(controls).toContain('data-ready');
   expect(controls).toContain('${startGame}');
   expect(shellSource).toContain('START GAME');
@@ -52,8 +52,8 @@ describe('compact lobby presentation',()=>{
  });
 
  it('keeps future controls presentation-only and trusted commands unchanged',()=>{
-  expect(shellSource).not.toMatch(/data-name-room|data-start-game/);
-  expect(shellSource).not.toMatch(/nameRoom\(|startGame\(/);
+  expect(shellSource).not.toMatch(/data-name-room/);
+  expect(shellSource).not.toMatch(/nameRoom\(/);
   expect(shellSource).toContain("leave({roomCode:lobby.room.code})");
   expect(shellSource).toContain('setColor({roomCode:lobby.room.code,playerColor})');
  });

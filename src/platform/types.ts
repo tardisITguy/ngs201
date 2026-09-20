@@ -4,6 +4,7 @@ export interface GameRecord {
  slug:string;
  name:string;
  status:'active'|'disabled';
+ min_players:number;
  max_players:number;
  created_at:string;
  updated_at:string;
@@ -78,3 +79,6 @@ export interface SetPlayerColorResult {roomCode:string;playerColor:string|null;c
 
 export interface SetPlayerReadyRequest {roomCode:string;isReady:boolean}
 export interface SetPlayerReadyResult {roomCode:string;isReady:boolean;changed:boolean}
+
+export interface StartGameRequest {roomCode:string}
+export interface StartGameResult {roomCode:string;status:'active';stateVersion:number}

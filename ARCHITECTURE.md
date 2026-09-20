@@ -251,10 +251,32 @@ ready player without a color. Actual color changes and clears continue to reset
 Ready, while same-color selection preserves it.
 
 Realtime remains deferred, so other players use **Refresh Players** to observe
-Ready changes. Start Game remains unimplemented. Its lobby display is only an
-advisory preview based on the current read model and Worship Me!'s engine
-minimum of two players; the future trusted Start command must revalidate all
-eligibility server-side before creating canonical state.
+Ready changes. The host's local Start eligibility display is advisory; the
+trusted Start command revalidates all eligibility server-side before creating
+canonical state.
+
+### Trusted Start Game command
+
+```text
+Browser roomCode only -> start-game Edge Function -> verified JWT
+  -> privileged ordered-lobby snapshot -> server crypto seed
+  -> existing Worship Me! createGame() -> start_game_server
+  -> locked exact-snapshot and lobby validation
+  -> turn_order + canonical room_states state/version + active status
+```
+
+Start is host-only and atomic. The Edge Function imports the existing pure
+engine setup implementation; the browser never constructs or submits players,
+order, seed, or canonical state. The database locks the room and rejects stale
+rosters before persisting anything. A successful Start writes state version 1,
+freezes the ordered roster, and activates the room exactly once. Canonical
+`room_states` remains unreadable to browser roles.
+
+Lobby order is stable `joined_at`, then `user_id`. Database `turn_order = 0`
+maps to engine `p1`, `1` to `p2`, and so on, using precisely the array supplied
+to `createGame()`. Name Room and Start Game are host-only controls. Active
+gameplay synchronization is intentionally deferred; active rooms currently
+show only a player-safe placeholder without reading canonical state.
 
 Worship Me! retains its own rules contract, state schema, actions, validation,
 resolution queue, production and victory behavior, save schema, AI strategies,
