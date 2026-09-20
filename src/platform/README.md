@@ -114,3 +114,30 @@ After membership exists, existing RLS permits that user to read the room and
 its `room_players`. `room_states` remains server-only. Realtime is deferred;
 the joining player loads the lobby immediately and the host uses **Refresh
 Players** to see the new member.
+
+## Lobby lifecycle
+
+An authenticated user may participate in at most one room whose status is
+`lobby`. Explicit Leave follows this trusted path:
+
+```text
+Browser -> leave-room Edge Function -> leave_room_server
+        -> remove membership -> transfer host or abandon empty lobby
+```
+
+Create and Join also perform an automatic atomic lobby transition. Each
+command acquires the same transaction-level advisory lock derived from the
+authenticated user ID, finds every prior lobby membership, locks all affected
+room rows in ascending UUID order, departs prior lobbies, performs host
+transfers, and then creates or enters the target lobby. Failure rolls back the
+whole transition. This also self-heals legacy multiple-lobby memberships.
+
+Host succession chooses the earliest remaining `joined_at`, with `user_id` as
+the stable tie-breaker. An empty lobby becomes `abandoned`. Active-game
+membership is intentionally outside this milestone.
+
+Browser Back, tab closure, crashes, unload events, and local storage are not
+authoritative lifecycle operations. Stale membership is cleaned up by the
+next trusted Create or Join; the in-app lobby control explicitly calls Leave.
+Realtime remains deferred, so remaining users may need **Refresh Players** to
+see host transfer.

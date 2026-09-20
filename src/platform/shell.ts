@@ -3,6 +3,7 @@ import {getDisplayName,saveIdentity,validateDisplayName} from './identity';
 import {createRouter,type Route} from './router';
 import {createHostAction} from './rooms/host';
 import {createJoinAction,normalizeRoomCode} from './rooms/joinRoom';
+import {createLeaveAction} from './rooms/leaveRoom';
 import {getLobby} from './rooms/lobby';
 
 const escapeHtml=(value:string)=>value.replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]!));
@@ -14,6 +15,7 @@ const button=(label:string,attrs='')=>`<button class="primary-button" ${attrs}>$
 export function startPlayShell(root:HTMLDivElement){
  const host=createHostAction();
  const join=createJoinAction();
+ const leave=createLeaveAction();
  let identityReturnPath:string|undefined;
  const router=createRouter(window,route=>void render(route));
  root.addEventListener('click',event=>{const link=(event.target as Element).closest<HTMLAnchorElement>('a[data-link]');if(link){event.preventDefault();router.navigate(new URL(link.href).pathname);}});
@@ -66,7 +68,23 @@ export function startPlayShell(root:HTMLDivElement){
 
  async function renderLobby(code:string){
   root.innerHTML=page(`<section class="lobby"><div class="status-panel" role="status"><span class="spinner"></span> Loading room…</div></section>`,true);
-  try{const lobby=await getLobby(code);const players=lobby.players.map(player=>`<li><span class="ready-icon" aria-label="${player.isReady?'Ready':'Not ready'}">${player.isReady?'✓':'○'}</span><strong>${escapeHtml(player.displayName)}</strong>${player.playerColor?`<span class="color-label">${escapeHtml(player.playerColor)}</span>`:''}${player.isHost?'<span class="host-badge">HOST</span>':''}</li>`).join('');root.querySelector('.lobby')!.innerHTML=`<a class="back-link" href="/games/worship-me" data-link>← Worship Me!</a><section class="room-banner"><div><p class="eyebrow">ROOM · ${escapeHtml(lobby.room.status.toUpperCase())}</p><h1>${escapeHtml(lobby.room.code)}</h1></div><button class="secondary-button compact" data-copy>Copy code</button></section><section class="lobby-grid"><div class="panel"><div class="panel-title"><h2>Players</h2><button class="text-button" data-refresh>Refresh</button></div><ul class="player-list">${players||'<li>No players found.</li>'}</ul></div><div class="panel future-panel"><h2>Choose color</h2><div class="color-options"><button disabled>Red</button><button disabled>Blue</button><button disabled>Green</button><button disabled>Yellow</button></div><span class="coming">COMING NEXT</span></div><div class="panel chat-panel"><h2>Chat</h2><p>Chat will appear here in the next multiplayer step.</p><span class="coming">COMING NEXT</span></div><div class="lobby-actions"><button class="secondary-button" disabled>READY <small>COMING NEXT</small></button>${lobby.room.isCurrentUserHost?'<button class="primary-button" disabled>START GAME <small>COMING NEXT</small></button>':''}</div></section>`;root.querySelector<HTMLButtonElement>('[data-refresh]')!.onclick=()=>void renderLobby(code);const copy=root.querySelector<HTMLButtonElement>('[data-copy]')!;copy.onclick=async()=>{try{await navigator.clipboard.writeText(lobby.room.code);copy.textContent='Copied!';}catch{copy.textContent='Copy unavailable';}};}catch(error){const message=error instanceof Error?error.message:"You don't have access to this room.";root.querySelector('.lobby')!.innerHTML=`<section class="status-panel error"><h1>Room unavailable</h1><p>${escapeHtml(message)}</p><a class="text-link" href="/games" data-link>Back to Games</a></section>`;}
+  try{
+   const lobby=await getLobby(code);
+   const players=lobby.players.map(player=>`<li><span class="ready-icon" aria-label="${player.isReady?'Ready':'Not ready'}">${player.isReady?'✓':'○'}</span><strong>${escapeHtml(player.displayName)}</strong>${player.playerColor?`<span class="color-label">${escapeHtml(player.playerColor)}</span>`:''}${player.isHost?'<span class="host-badge">HOST</span>':''}</li>`).join('');
+   const hostHelp=lobby.room.isCurrentUserHost?'<p class="lede">If other players remain, host control passes to the longest-waiting player.</p>':'';
+   root.querySelector('.lobby')!.innerHTML=`<button class="secondary-button compact" data-leave>LEAVE LOBBY</button>${hostHelp}<p class="form-message" data-leave-message aria-live="polite"></p><section class="room-banner"><div><p class="eyebrow">ROOM · ${escapeHtml(lobby.room.status.toUpperCase())}</p><h1>${escapeHtml(lobby.room.code)}</h1></div><button class="secondary-button compact" data-copy>Copy code</button></section><section class="lobby-grid"><div class="panel"><div class="panel-title"><h2>Players</h2><button class="text-button" data-refresh>Refresh</button></div><ul class="player-list">${players||'<li>No players found.</li>'}</ul></div><div class="panel future-panel"><h2>Choose color</h2><div class="color-options"><button disabled>Red</button><button disabled>Blue</button><button disabled>Green</button><button disabled>Yellow</button></div><span class="coming">COMING NEXT</span></div><div class="panel chat-panel"><h2>Chat</h2><p>Chat will appear here in the next multiplayer step.</p><span class="coming">COMING NEXT</span></div><div class="lobby-actions"><button class="secondary-button" disabled>READY <small>COMING NEXT</small></button>${lobby.room.isCurrentUserHost?'<button class="primary-button" disabled>START GAME <small>COMING NEXT</small></button>':''}</div></section>`;
+   root.querySelector<HTMLButtonElement>('[data-refresh]')!.onclick=()=>void renderLobby(code);
+   const copy=root.querySelector<HTMLButtonElement>('[data-copy]')!;
+   copy.onclick=async()=>{try{await navigator.clipboard.writeText(lobby.room.code);copy.textContent='Copied!';}catch{copy.textContent='Copy unavailable';}};
+   const leaveButton=root.querySelector<HTMLButtonElement>('[data-leave]')!,leaveMessage=root.querySelector<HTMLElement>('[data-leave-message]')!;
+   leaveButton.onclick=async()=>{
+    if(!window.confirm('Leave this lobby?'))return;
+    leaveButton.disabled=true;leaveButton.textContent='LEAVING LOBBY…';leaveMessage.textContent='Leaving lobby...';
+    try{const result=await leave({roomCode:lobby.room.code});if(result)router.navigate('/games/worship-me');}
+    catch{leaveMessage.textContent='We could not leave the lobby. Please try again.';}
+    finally{if(document.body.contains(leaveButton)){leaveButton.disabled=false;leaveButton.textContent='LEAVE LOBBY';}}
+   };
+  }catch(error){const message=error instanceof Error?error.message:"You don't have access to this room.";root.querySelector('.lobby')!.innerHTML=`<section class="status-panel error"><h1>Room unavailable</h1><p>${escapeHtml(message)}</p><a class="text-link" href="/games" data-link>Back to Games</a></section>`;}
  }
  router.start();
 }

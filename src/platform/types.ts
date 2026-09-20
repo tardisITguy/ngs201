@@ -66,3 +66,9 @@ export interface JoinRoomResult {
  };
  joinedNew:boolean;
 }
+
+export interface LeaveRoomRequest {roomCode:string}
+
+export interface LeaveRoomResult {
+ completed:true;
+}

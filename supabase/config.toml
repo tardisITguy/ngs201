@@ -3,3 +3,6 @@ verify_jwt = true
 
 [functions.join-room]
 verify_jwt = true
+
+[functions.leave-room]
+verify_jwt = true

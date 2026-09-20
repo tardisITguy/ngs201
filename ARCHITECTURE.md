@@ -182,6 +182,36 @@ The former development-only local Undo control has been removed. A future
 multiplayer undo policy, if desired, would require an explicit authorized
 server command and must never rewind canonical shared state client-side.
 
+### Lobby lifecycle and single-lobby membership
+
+An authenticated user may belong to at most one `lobby` room. Explicit leave
+uses the same trusted-command boundary:
+
+```text
+Browser -> leave-room Edge Function -> verified caller identity
+        -> service-only leave_room_server -> membership removal
+        -> deterministic host transfer or empty-room abandonment
+```
+
+Create, Join, and Leave take a transaction-level advisory lock derived from
+the authenticated user UUID. Create and Join identify all relevant lobby rooms
+and lock their rows in ascending UUID order before mutating membership. This
+serializes same-user concurrent commands and avoids arbitrary cross-room lock
+ordering. Failure restores old membership through transaction rollback, and a
+successful command self-heals legacy multiple-lobby membership.
+
+Host succession selects the earliest remaining `joined_at`, using `user_id` as
+a deterministic secondary key. If no member remains, the lobby is marked
+`abandoned`; the room and canonical `room_states` row are retained. These
+rules apply only to lobbies. Active-game disconnect and reconnect semantics
+remain deferred.
+
+Browser navigation, unload, tab closure, and local storage are never
+authoritative lobby mutations. The explicit lobby button calls Leave Lobby;
+otherwise the next trusted Create or Join cleans up stale membership. Realtime
+is still deferred, so remaining players use **Refresh Players** to observe a
+host transfer.
+
 ## Game-specific responsibilities
 
 Worship Me! retains its own rules contract, state schema, actions, validation,
