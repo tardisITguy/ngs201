@@ -9,6 +9,8 @@ import {getLobby,LobbyReadError} from '../src/platform/rooms/lobby';
 
 const session={access_token:'token',user:{id:'host-1'}};
 const auth={getSession:vi.fn().mockResolvedValue({data:{session},error:null})};
+const shellSource=readFileSync(new URL('../src/platform/shell.ts',import.meta.url),'utf8');
+const shellCss=readFileSync(new URL('../src/platform/colorSelection.css',import.meta.url),'utf8');
 
 describe('NGS identity',()=>{
  it('trims, validates, authenticates, and persists only the display name',async()=>{const values=new Map<string,string>(),storage={setItem:(key:string,value:string)=>values.set(key,value),getItem:(key:string)=>values.get(key)??null},ensure=vi.fn().mockResolvedValue({});expect(validateDisplayName('   ')).toMatch(/required/);expect(validateDisplayName('x'.repeat(51))).toMatch(/50/);await expect(saveIdentity('  Test Host  ',storage,ensure)).resolves.toBe('Test Host');expect(ensure).toHaveBeenCalledOnce();expect(values.get(PLAYER_DISPLAY_NAME_KEY)).toBe('Test Host');expect([...values.keys()]).toEqual([PLAYER_DISPLAY_NAME_KEY]);expect(getDisplayName(storage)).toBe('Test Host');});
@@ -33,7 +35,37 @@ describe('lobby read model',()=>{
  it('sanitizes inaccessible rooms',async()=>{const room={select:()=>room,eq:()=>room,maybeSingle:async()=>({data:null,error:Error('postgres detail')})};const client={auth,from:()=>room} as unknown as SupabaseClient;await expect(getLobby('ABC234',client)).rejects.toEqual(new LobbyReadError());});
 });
 
+describe('compact lobby presentation',()=>{
+ it('groups real and future actions in one Lobby Controls strip',()=>{
+  const controls=shellSource.match(/<section class="lobby-controls"[\s\S]*?<\/section>/)?.[0]??'';
+  expect(controls).toContain('LOBBY CONTROLS');
+  expect(controls).toContain('lobby-controls__room');
+  expect(controls).toContain('lobby-controls__actions');
+  expect(controls).toContain('data-copy');
+  expect(controls).toContain('data-leave');
+  expect(controls).toContain('Name Room');
+  expect(controls).toContain('READY');
+  expect(controls).toContain('${startGame}');
+  expect(shellSource).toContain('START GAME');
+  expect(controls.match(/disabled/g)?.length).toBeGreaterThanOrEqual(2);
+  expect(shellSource.indexOf('data-leave')).toBeGreaterThan(shellSource.indexOf('class="lobby-controls"'));
+ });
+
+ it('keeps future controls presentation-only and trusted commands unchanged',()=>{
+  expect(shellSource).not.toMatch(/data-name-room|data-ready|data-start-game/);
+  expect(shellSource).not.toMatch(/nameRoom\(|readyRoom\(|startGame\(/);
+  expect(shellSource).toContain("leave({roomCode:lobby.room.code})");
+  expect(shellSource).toContain('setColor({roomCode:lobby.room.code,playerColor})');
+ });
+
+ it('places Players and Chat together in a responsive equal-column container',()=>{
+  expect(shellSource).toMatch(/<section class="lobby-content-grid"><div class="panel players-panel">[\s\S]*?<div class="panel chat-panel">/);
+  expect(shellCss).toContain('grid-template-columns:minmax(0,1fr) minmax(0,1fr)');
+  expect(shellCss).toMatch(/@media\(max-width:700px\)[\s\S]*?\.lobby-content-grid\{grid-template-columns:1fr\}/);
+ });
+});
+
 describe('security and hosting source audit',()=>{
- it('keeps browser source read-only and canonical state out of lobby code',()=>{const shell=readFileSync(new URL('../src/platform/shell.ts',import.meta.url),'utf8'),lobby=readFileSync(new URL('../src/platform/rooms/lobby.ts',import.meta.url),'utf8'),join=readFileSync(new URL('../src/platform/rooms/joinRoom.ts',import.meta.url),'utf8'),leave=readFileSync(new URL('../src/platform/rooms/leaveRoom.ts',import.meta.url),'utf8');expect(shell+lobby+join+leave).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(/);expect(lobby).not.toContain("from('room_states')");expect(join+leave).not.toMatch(/\.from\(['"](?:rooms|room_players|room_states)/);expect(shell+join+leave).not.toMatch(/host_user_id|service.role|secret.key/i);});
+ it('keeps browser source read-only and canonical state out of lobby code',()=>{const lobby=readFileSync(new URL('../src/platform/rooms/lobby.ts',import.meta.url),'utf8'),join=readFileSync(new URL('../src/platform/rooms/joinRoom.ts',import.meta.url),'utf8'),leave=readFileSync(new URL('../src/platform/rooms/leaveRoom.ts',import.meta.url),'utf8');expect(shellSource+lobby+join+leave).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(/);expect(lobby).not.toContain("from('room_states')");expect(join+leave).not.toMatch(/\.from\(['"](?:rooms|room_players|room_states)/);expect(shellSource+join+leave).not.toMatch(/host_user_id|service.role|secret.key/i);});
  it('has the Hostinger fallback source',()=>{const file=new URL('../public/.htaccess',import.meta.url);expect(readFileSync(file,'utf8')).toContain('RewriteRule . /index.html [L]');});
 });
