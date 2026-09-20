@@ -4,6 +4,7 @@ export interface GameRecord {
  slug:string;
  name:string;
  status:'active'|'disabled';
+ max_players:number;
  created_at:string;
  updated_at:string;
 }
@@ -49,4 +50,19 @@ export interface CreateRoomResult {
   gameId:string;
   status:'lobby';
  };
+}
+
+export interface JoinRoomRequest {
+ roomCode:string;
+ displayName:string;
+}
+
+export interface JoinRoomResult {
+ room:{
+  id:string;
+  code:string;
+  gameId:string;
+  status:'lobby';
+ };
+ joinedNew:boolean;
 }

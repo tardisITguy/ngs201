@@ -154,6 +154,30 @@ commands. Future mutations should use this same authenticated Edge Function to
 service-only atomic-command pattern and expose player-safe views/events rather
 than canonical `game_state`.
 
+### Second trusted command: Join Room
+
+```text
+Player B with an authenticated anonymous Supabase identity
+        -> room code entry
+        -> join-room Edge Function
+        -> verified caller identity
+        -> service-only join_room_server RPC
+        -> atomic room_players membership
+        -> RLS-protected room + room_players reads
+```
+
+The Join screen is `/games/worship-me/join`. Room codes enable discovery but
+confer no authorization. A non-member cannot query an arbitrary room, so the
+browser invokes the trusted command without a preflight lookup. The server
+locks the room row, requires lobby status, and checks the active game's
+persisted `max_players` before inserting a new member. Existing-member rejoin
+is idempotent and refreshes the validated display name and `last_seen_at`.
+
+The browser sends only `roomCode` and `displayName`; the Edge Function derives
+the user ID from the validated JWT. `room_states` remains server-only. Realtime
+is deliberately deferred: the joining player loads the existing lobby after
+membership is created, while the host manually uses **Refresh Players**.
+
 The former development-only local Undo control has been removed. A future
 multiplayer undo policy, if desired, would require an explicit authorized
 server command and must never rewind canonical shared state client-side.

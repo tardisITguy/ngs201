@@ -1,2 +1,5 @@
 [functions.create-room]
 verify_jwt = true
+
+[functions.join-room]
+verify_jwt = true

@@ -15,7 +15,7 @@ describe('NGS identity',()=>{
 });
 
 describe('History routes',()=>{
- it.each([['/','identity'],['/games','games'],['/games/worship-me','worship-me'],['/room/ABC234','room']])('resolves %s', (path,name)=>expect(resolveRoute(path).name).toBe(name));
+ it.each([['/','identity'],['/games','games'],['/games/worship-me','worship-me'],['/games/worship-me/join','worship-me-join'],['/room/ABC234','room']])('resolves %s', (path,name)=>expect(resolveRoute(path).name).toBe(name));
  it('renders pushes and popstate navigation',()=>{let path='/',pop=()=>{},pushes=0;const seen:string[]=[];const win={location:{get pathname(){return path}},history:{pushState:(_d:unknown,_t:string,url?:string|URL|null)=>{path=String(url);pushes++;}},addEventListener:(_type:'popstate',listener:()=>void)=>{pop=listener;}};const router=createRouter(win,route=>seen.push(route.name));router.start();router.navigate('/games');path='/';pop();expect(pushes).toBe(1);expect(seen).toEqual(['identity','games','identity']);});
 });
 
@@ -34,6 +34,6 @@ describe('lobby read model',()=>{
 });
 
 describe('security and hosting source audit',()=>{
- it('keeps browser source read-only and canonical state out of lobby code',()=>{const shell=readFileSync(new URL('../src/platform/shell.ts',import.meta.url),'utf8'),lobby=readFileSync(new URL('../src/platform/rooms/lobby.ts',import.meta.url),'utf8');expect(shell+lobby).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(/);expect(lobby).not.toContain("from('room_states')");expect(shell).not.toMatch(/host_user_id|service.role|secret.key/i);expect(shell).toContain('disabled');});
+ it('keeps browser source read-only and canonical state out of lobby code',()=>{const shell=readFileSync(new URL('../src/platform/shell.ts',import.meta.url),'utf8'),lobby=readFileSync(new URL('../src/platform/rooms/lobby.ts',import.meta.url),'utf8'),join=readFileSync(new URL('../src/platform/rooms/joinRoom.ts',import.meta.url),'utf8');expect(shell+lobby+join).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(/);expect(lobby).not.toContain("from('room_states')");expect(join).not.toMatch(/\.from\(['"](?:rooms|room_players|room_states)/);expect(shell+join).not.toMatch(/host_user_id|service.role|secret.key/i);});
  it('has the Hostinger fallback source',()=>{const file=new URL('../public/.htaccess',import.meta.url);expect(readFileSync(file,'utf8')).toContain('RewriteRule . /index.html [L]');});
 });

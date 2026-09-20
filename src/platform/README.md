@@ -89,3 +89,28 @@ The initial host has no color or turn order. Color selection, Ready, Start
 Game, and the one-time random persisted turn-order assignment are later
 trusted commands. Canonical `room_states.game_state` remains server-only and
 will eventually be transformed into player-safe views or events.
+
+## Trusted Join Room flow
+
+```text
+Player B with an authenticated anonymous Supabase identity
+        -> room code entry
+        -> join-room Edge Function
+        -> verified caller identity
+        -> service-only join_room_server RPC
+        -> atomic room_players membership
+        -> existing RLS-protected lobby reads
+```
+
+The Join screen is `/games/worship-me/join`. A room code is discovery
+information, not authorization: non-members cannot browse rooms and the
+browser performs no existence lookup before calling the trusted command. The
+server locks the lobby row, reads the active game's authoritative
+`max_players`, and prevents concurrent final-slot joins from overfilling the
+room. Rejoining with the same authenticated user is idempotent; it refreshes
+the validated display name and `last_seen_at` without consuming another slot.
+
+After membership exists, existing RLS permits that user to read the room and
+its `room_players`. `room_states` remains server-only. Realtime is deferred;
+the joining player loads the lobby immediately and the host uses **Refresh
+Players** to see the new member.

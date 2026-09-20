@@ -2,6 +2,7 @@ import {listActiveGames} from './games/catalog';
 import {getDisplayName,saveIdentity,validateDisplayName} from './identity';
 import {createRouter,type Route} from './router';
 import {createHostAction} from './rooms/host';
+import {createJoinAction,normalizeRoomCode} from './rooms/joinRoom';
 import {getLobby} from './rooms/lobby';
 
 const escapeHtml=(value:string)=>value.replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]!));
@@ -12,6 +13,8 @@ const button=(label:string,attrs='')=>`<button class="primary-button" ${attrs}>$
 
 export function startPlayShell(root:HTMLDivElement){
  const host=createHostAction();
+ const join=createJoinAction();
+ let identityReturnPath:string|undefined;
  const router=createRouter(window,route=>void render(route));
  root.addEventListener('click',event=>{const link=(event.target as Element).closest<HTMLAnchorElement>('a[data-link]');if(link){event.preventDefault();router.navigate(new URL(link.href).pathname);}});
 
@@ -19,6 +22,10 @@ export function startPlayShell(root:HTMLDivElement){
   if(route.name==='identity')return renderIdentity();
   if(route.name==='games')return renderGames();
   if(route.name==='worship-me')return renderGameLanding();
+  if(route.name==='worship-me-join'){
+   if(!getDisplayName()){identityReturnPath='/games/worship-me/join';router.navigate('/');return;}
+   return renderJoin();
+  }
   if(route.name==='room')return renderLobby(route.code);
   root.innerHTML=page(`<section class="panel centered"><p class="eyebrow">404</p><h1>Page not found</h1><a class="text-link" href="/" data-link>Return home</a></section>`);
  }
@@ -27,7 +34,7 @@ export function startPlayShell(root:HTMLDivElement){
   const name=getDisplayName();
   root.innerHTML=page(`<section class="identity panel"><p class="eyebrow">WELCOME</p><h1>Ready to play?</h1><p class="lede">Choose the name other players will see.</p><form data-identity novalidate><label for="display-name">What should we call you?</label><input id="display-name" name="displayName" value="${escapeHtml(name)}" maxlength="50" autocomplete="nickname" autofocus><p class="form-message" data-message aria-live="polite"></p>${button('CONTINUE','type="submit"')}</form></section>`);
   const form=root.querySelector<HTMLFormElement>('[data-identity]')!,input=form.elements.namedItem('displayName') as HTMLInputElement,message=form.querySelector<HTMLElement>('[data-message]')!,submit=form.querySelector<HTMLButtonElement>('button')!;
-  form.onsubmit=async event=>{event.preventDefault();const validation=validateDisplayName(input.value);if(validation){message.textContent=validation;input.focus();return;}submit.disabled=true;submit.textContent='STARTING SESSION…';message.textContent='';try{await saveIdentity(input.value);router.navigate('/games');}catch{message.textContent='We could not start your player session. Check your connection and try again.';submit.disabled=false;submit.textContent='CONTINUE';}};
+  form.onsubmit=async event=>{event.preventDefault();const validation=validateDisplayName(input.value);if(validation){message.textContent=validation;input.focus();return;}submit.disabled=true;submit.textContent='STARTING SESSION…';message.textContent='';try{await saveIdentity(input.value);const destination=identityReturnPath??'/games';identityReturnPath=undefined;router.navigate(destination);}catch{message.textContent='We could not start your player session. Check your connection and try again.';submit.disabled=false;submit.textContent='CONTINUE';}};
  }
 
  async function renderGames(){
@@ -36,9 +43,25 @@ export function startPlayShell(root:HTMLDivElement){
  }
 
  function renderGameLanding(){
-  root.innerHTML=page(`<section class="game-hero"><a class="back-link" href="/games" data-link>← Back to Games</a><div class="worship-emblem" aria-hidden="true">W</div><p class="eyebrow">AN NGS ORIGINAL</p><h1>WORSHIP ME!</h1><p class="hero-tagline">Rule the Faithful.</p><p class="hero-copy">Build belief, command your followers, and outlast rival gods in a strategic struggle for devotion.</p><div class="hero-actions">${button('HOST GAME','data-host')}<button class="secondary-button" disabled>JOIN GAME <small>COMING NEXT</small></button></div><p class="form-message" data-message aria-live="polite"></p></section>`,true);
+  root.innerHTML=page(`<section class="game-hero"><a class="back-link" href="/games" data-link>← Back to Games</a><div class="worship-emblem" aria-hidden="true">W</div><p class="eyebrow">AN NGS ORIGINAL</p><h1>WORSHIP ME!</h1><p class="hero-tagline">Rule the Faithful.</p><p class="hero-copy">Build belief, command your followers, and outlast rival gods in a strategic struggle for devotion.</p><div class="hero-actions">${button('HOST GAME','data-host')}<a class="secondary-button text-link" href="/games/worship-me/join" data-link>JOIN GAME</a></div><p class="form-message" data-message aria-live="polite"></p></section>`,true);
   const hostButton=root.querySelector<HTMLButtonElement>('[data-host]')!,message=root.querySelector<HTMLElement>('[data-message]')!;
   hostButton.onclick=async()=>{const displayName=getDisplayName();if(!displayName){router.navigate('/');return;}hostButton.disabled=true;hostButton.textContent='CREATING ROOM…';message.textContent='';try{const result=await host(displayName);if(result)router.navigate(`/room/${encodeURIComponent(result.room.code)}`);}catch{message.textContent='We could not create the room. Please try again.';}finally{if(document.body.contains(hostButton)){hostButton.disabled=false;hostButton.textContent='HOST GAME';}}};
+ }
+
+ function renderJoin(){
+  root.innerHTML=page(`<section class="identity panel"><a class="back-link" href="/games/worship-me" data-link>← Back to Worship Me!</a><p class="eyebrow">NEW GAME STUDIOS</p><h1>JOIN A ROOM</h1><p class="lede">WORSHIP ME!</p><form data-join novalidate><label for="room-code">Room Code</label><input id="room-code" name="roomCode" minlength="6" maxlength="10" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC234" autofocus><p class="form-message" data-message aria-live="polite"></p>${button('JOIN ROOM','type="submit"')}</form></section>`,true);
+  const form=root.querySelector<HTMLFormElement>('[data-join]')!,input=form.elements.namedItem('roomCode') as HTMLInputElement,message=form.querySelector<HTMLElement>('[data-message]')!,submit=form.querySelector<HTMLButtonElement>('button')!;
+  input.oninput=()=>{input.value=input.value.toUpperCase();};
+  form.onsubmit=async event=>{
+   event.preventDefault();
+   const roomCode=normalizeRoomCode(input.value),displayName=getDisplayName();
+   if(!displayName){identityReturnPath='/games/worship-me/join';router.navigate('/');return;}
+   if(roomCode.length<6||roomCode.length>10||!/^[A-Z0-9]+$/.test(roomCode)){message.textContent='Enter a valid room code.';input.focus();return;}
+   input.value=roomCode;submit.disabled=true;submit.textContent='JOINING ROOM…';message.textContent='Joining room...';
+   try{const result=await join({roomCode,displayName});if(result)router.navigate(`/room/${encodeURIComponent(result.room.code)}`);}
+   catch{message.textContent='We could not join that room. Check the code and try again.';}
+   finally{if(document.body.contains(submit)){submit.disabled=false;submit.textContent='JOIN ROOM';}}
+  };
  }
 
  async function renderLobby(code:string){
