@@ -47,7 +47,7 @@ describe('Set Player Color browser client',()=>{
 });
 
 describe('player color migration and RPC',()=>{
- it('retains the player-color migration in history',()=>{const names=readdirSync(new URL('../supabase/migrations/',import.meta.url),{withFileTypes:true}).filter(entry=>!entry.isDirectory()&&entry.name.endsWith('.sql')).map(entry=>entry.name).sort();expect(names).toContain('20260920000002_player_color_selection.sql');expect(names).toHaveLength(8);});
+ it('retains the player-color migration in history',()=>{const names=readdirSync(new URL('../supabase/migrations/',import.meta.url),{withFileTypes:true}).filter(entry=>!entry.isDirectory()&&entry.name.endsWith('.sql')).map(entry=>entry.name).sort();expect(names).toContain('20260920000002_player_color_selection.sql');expect(names).toHaveLength(9);});
 
  it('creates server-only normalized game color metadata seeded with exact colors',()=>{
   expect(migration).toContain('create table public.game_player_colors');

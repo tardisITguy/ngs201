@@ -197,5 +197,22 @@ started again. `room_states` retains no browser read policy or grant.
 
 Stable lobby ordering is `joined_at`, then `user_id`; `turn_order 0` maps to
 engine `p1`, `1` to `p2`, and so forth. Name Room and Start Game render only for
-the host. Active gameplay synchronization is deferred, so the active room view
-is a player-safe placeholder and never reads or recreates canonical state.
+the host.
+
+## Trusted active game reads
+
+An authenticated active-room member sends only `roomCode` to the
+`get-game-state` Edge Function. It verifies the JWT, calls the service-only
+`get_active_game_state_server`, and passes canonical state through
+`buildWorshipMePublicGameView` before responding.
+
+Raw canonical GameState is never sent to browsers. The allowlisted public DTO
+excludes face-down `hiddenKind`, `seed`, `rngState`, `removedVillageTiles`,
+`newVillagerBag`, `history`, and `eventLog`. Browser roles retain no access to
+`room_states`.
+
+Persisted `turn_order` derives `viewerPlayerId` (`0` to `p1`, `1` to `p2`,
+etc.), while the projection supplies canonical `currentPlayerId` and the
+response supplies canonical `stateVersion`. The active page is read-only and
+updates only through the manual **Refresh Game** button. Gameplay mutation is
+deferred to Milestone 8 and Realtime to Milestone 9.

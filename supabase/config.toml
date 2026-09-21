@@ -15,3 +15,6 @@ verify_jwt = true
 
 [functions.start-game]
 verify_jwt = true
+
+[functions.get-game-state]
+verify_jwt = true

@@ -7,11 +7,14 @@ import {createLeaveAction} from './rooms/leaveRoom';
 import {createSetPlayerColorAction,SetPlayerColorError} from './rooms/setPlayerColor';
 import {createSetPlayerReadyAction,SetPlayerReadyError} from './rooms/setPlayerReady';
 import {createStartGameAction,StartGameError} from './rooms/startGame';
+import {createGetActiveGameStateAction,ActiveGameStateError} from './rooms/getActiveGameState';
 import {getLobby} from './rooms/lobby';
 import {renderLobbyPlayerRows} from './rooms/lobbyPlayerRows';
+import {renderBoard} from '../games/worship-me/ui/renderBoard';
 import {defaultConfig} from '../games/worship-me/engine/config';
 import {WORSHIP_ME_PLAYER_COLORS} from '../games/worship-me/ui/playerColors';
 import './colorSelection.css';
+import './activeGame.css';
 
 const escapeHtml=(value:string)=>value.replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]!));
 const logo=()=>`<a class="brand" href="/" data-link aria-label="New Game Studios home"><img src="/brand/ngs/bannerlogo.png" alt="New Game Studios"><span>THE FUTURE IS NEW</span></a>`;
@@ -26,6 +29,7 @@ export function startPlayShell(root:HTMLDivElement){
  const setColor=createSetPlayerColorAction();
  const setReady=createSetPlayerReadyAction();
  const start=createStartGameAction();
+ const getGameState=createGetActiveGameStateAction();
  let identityReturnPath:string|undefined;
  const router=createRouter(window,route=>void render(route));
  root.addEventListener('click',event=>{const link=(event.target as Element).closest<HTMLAnchorElement>('a[data-link]');if(link){event.preventDefault();router.navigate(new URL(link.href).pathname);}});
@@ -81,11 +85,9 @@ export function startPlayShell(root:HTMLDivElement){
   try{
    const lobby=await getLobby(code);
    if(lobby.room.status==='active'){
-    const ordered=[...lobby.players].sort((a,b)=>(a.turnOrder??Number.MAX_SAFE_INTEGER)-(b.turnOrder??Number.MAX_SAFE_INTEGER));
-    const activePlayers=ordered.map((player,index)=>`<li><strong>${index+1}. ${escapeHtml(player.displayName)}</strong><span>${escapeHtml(player.playerColor?player.playerColor[0].toUpperCase()+player.playerColor.slice(1):'No color')}</span></li>`).join('');
-    root.querySelector('.lobby')!.innerHTML=`<section class="panel active-game-placeholder"><p class="eyebrow">WORSHIP ME!</p><h1>GAME STARTED</h1><p class="lede">Room ${escapeHtml(lobby.room.code)}</p><h2>Players</h2><ol class="active-player-list">${activePlayers}</ol><p>Canonical game state has been initialized.</p><p class="coming">Gameplay synchronization is coming next.</p></section>`;
-    return;
+    return renderActiveGame(lobby.room.code);
    }
+   if(lobby.room.status!=='lobby'){root.querySelector('.lobby')!.innerHTML=`<section class="status-panel"><h1>Room unavailable</h1><p>This room is no longer an active lobby.</p><a class="text-link" href="/games" data-link>Back to Games</a></section>`;return;}
    const players=renderLobbyPlayerRows(lobby.players);
    const currentPlayer=lobby.players.find(player=>player.isCurrentUser),canReady=WORSHIP_ME_PLAYER_COLORS.includes(currentPlayer?.playerColor as (typeof WORSHIP_ME_PLAYER_COLORS)[number]),readyLabel=currentPlayer?.isReady?'NOT READY':'READY';
    const allReadyPreview=lobby.players.length>=defaultConfig.playerMin&&lobby.players.every(player=>player.isReady&&WORSHIP_ME_PLAYER_COLORS.includes(player.playerColor as (typeof WORSHIP_ME_PLAYER_COLORS)[number]));
@@ -124,6 +126,19 @@ export function startPlayShell(root:HTMLDivElement){
     catch(error){const message=error instanceof StartGameError?error.message:'Unable to start game.';await renderLobby(code,message);}
    };
   }catch(error){const message=error instanceof Error?error.message:"You don't have access to this room.";root.querySelector('.lobby')!.innerHTML=`<section class="status-panel error"><h1>Room unavailable</h1><p>${escapeHtml(message)}</p><a class="text-link" href="/games" data-link>Back to Games</a></section>`;}
+ }
+
+ async function renderActiveGame(code:string,showLoading=true){
+  const holder=root.querySelector<HTMLElement>('.lobby');if(!holder)return;
+  if(showLoading)holder.innerHTML=`<div class="status-panel" role="status"><span class="spinner"></span> Loading game…</div>`;
+  try{
+   const result=await getGameState({roomCode:code});if(!result)return;
+   const view=result.gameView,current=view.players.find(player=>player.id===view.currentPlayerId),viewer=view.players.find(player=>player.id===result.viewerPlayerId),direction=view.direction===1?'Clockwise':'Counterclockwise';
+   const players=view.players.map((player,index)=>`<li><strong>${index+1}. ${escapeHtml(player.name)}</strong><span>${escapeHtml(player.color)}</span>${player.id===view.currentPlayerId?'<small class="active-game__badge">CURRENT TURN</small>':''}${player.id===result.viewerPlayerId?'<small class="active-game__badge">YOU</small>':''}</li>`).join('');
+   holder.innerHTML=`<section class="active-game"><div class="panel active-game__status"><div class="active-game__status-top"><div><p class="eyebrow">WORSHIP ME!</p><h1>ROOM ${escapeHtml(result.roomCode)}</h1><span class="active-game__version">STATE VERSION ${result.stateVersion}</span></div><button class="primary-button compact" type="button" data-refresh-game>REFRESH GAME</button></div><div class="active-game__turns"><p>Round ${view.round} · ${escapeHtml(view.phase)} · ${direction}</p><p>Current Turn: <strong>${escapeHtml(current?.name??view.currentPlayerId)} · ${escapeHtml(current?.color??'Unknown')}</strong></p><p>You: <strong>${escapeHtml(viewer?.name??result.viewerPlayerId)} · ${escapeHtml(viewer?.color??'Unknown')}</strong></p></div><p class="form-message" data-game-message aria-live="polite"></p></div><div class="active-game__board-scroll"><div class="multiplayer-board">${renderBoard(view,{}, {interactive:false})}</div></div><section class="panel active-game__players"><h2>PLAYERS</h2><ol>${players}</ol></section><p class="active-game__readonly">READ ONLY · GAMEPLAY CONTROLS COMING NEXT</p></section>`;
+   const refresh=holder.querySelector<HTMLButtonElement>('[data-refresh-game]')!,message=holder.querySelector<HTMLElement>('[data-game-message]')!;
+   refresh.onclick=async()=>{refresh.disabled=true;refresh.textContent='REFRESHING…';message.textContent='';await renderActiveGame(code,false);};
+  }catch(error){const message=error instanceof ActiveGameStateError?error.message:'Game state is unavailable';holder.innerHTML=`<section class="status-panel error"><h1>Game unavailable</h1><p>${escapeHtml(message)}</p><button class="primary-button" type="button" data-retry-game>TRY AGAIN</button></section>`;holder.querySelector<HTMLButtonElement>('[data-retry-game]')!.onclick=()=>void renderActiveGame(code);}
  }
  router.start();
 }

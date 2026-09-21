@@ -1,4 +1,5 @@
 /** Generic NGSLLC platform records exposed to authenticated clients. */
+import type {WorshipMePublicGameView} from '../games/worship-me/publicGameView';
 export interface GameRecord {
  id:string;
  slug:string;
@@ -82,3 +83,6 @@ export interface SetPlayerReadyResult {roomCode:string;isReady:boolean;changed:b
 
 export interface StartGameRequest {roomCode:string}
 export interface StartGameResult {roomCode:string;status:'active';stateVersion:number}
+
+export interface ActiveGameStateRequest {roomCode:string}
+export interface ActiveGameStateResult {roomCode:string;status:'active';stateVersion:number;viewerPlayerId:string;gameView:WorshipMePublicGameView}

@@ -274,9 +274,28 @@ freezes the ordered roster, and activates the room exactly once. Canonical
 
 Lobby order is stable `joined_at`, then `user_id`. Database `turn_order = 0`
 maps to engine `p1`, `1` to `p2`, and so on, using precisely the array supplied
-to `createGame()`. Name Room and Start Game are host-only controls. Active
-gameplay synchronization is intentionally deferred; active rooms currently
-show only a player-safe placeholder without reading canonical state.
+to `createGame()`. Name Room and Start Game are host-only controls.
+
+### Trusted active game-state delivery
+
+```text
+Browser roomCode only -> get-game-state Edge Function -> verified JWT
+  -> service-only get_active_game_state_server -> membership-gated room_states read
+  -> buildWorshipMePublicGameView allowlist projection -> read-only board
+```
+
+**Raw canonical GameState is never sent to the browser.** Canonical state
+contains face-down `hiddenKind`, the setup seed, RNG state, removed tiles, bag
+contents, history, and a seed-bearing event log. The server constructs a new
+allowlisted DTO rather than shallow-copying and redacting state. Browser roles
+retain no access to `room_states`.
+
+Persisted `turn_order` maps to engine IDs (`0` to `p1`, `1` to `p2`, and so
+on), allowing the trusted response to identify `viewerPlayerId`.
+`currentPlayerId` comes from canonical `turnOrder[currentPlayerIndex]`, and
+the response carries canonical `stateVersion` without changing it. Refresh is
+manual only. Gameplay mutation is deferred to Milestone 8 and Realtime to
+Milestone 9.
 
 Worship Me! retains its own rules contract, state schema, actions, validation,
 resolution queue, production and victory behavior, save schema, AI strategies,
