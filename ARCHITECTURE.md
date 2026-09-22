@@ -53,7 +53,7 @@ Hostinger: play.newgamestudios.com (static Vite application)
 
 GitHub remains the source of truth. Hostinger serves the compiled static app
 and its Apache History API fallback. Supabase provides Auth, Postgres, Edge
-Functions, and future Realtime. `ngsllc-dev` is currently the development
+Functions, and safe game-version Realtime. `ngsllc-dev` is currently the development
 backend; `play.newgamestudios.com` remains an unlinked development/test
 deployment until `ngsllc-prod` exists.
 
@@ -293,8 +293,8 @@ retain no access to `room_states`.
 Persisted `turn_order` maps to engine IDs (`0` to `p1`, `1` to `p2`, and so
 on), allowing the trusted response to identify `viewerPlayerId`.
 `currentPlayerId` comes from canonical `turnOrder[currentPlayerIndex]`, and
-the response carries canonical `stateVersion` without changing it. Refresh is
-manual only; Realtime remains deferred to Milestone 9.
+the response carries canonical `stateVersion` without changing it. Manual
+**Refresh Game** remains available as a fallback to live synchronization.
 
 ### Trusted gameplay mutation
 
@@ -321,7 +321,36 @@ version, confirms the locked current player, and preserves setup identity such
 as seed, config, roster, turn order, and board structure. Stale commands fail
 without overwriting newer state. The public DTO exposes only an allowlisted
 pending choice and never canonical `pendingResolution` or its `queueIndex`.
-Other players still use **Refresh Game**; there is no polling or Realtime.
+### Safe Realtime game synchronization
+
+```text
+canonical room_states -> trusted DB mutation -> safe version-signal trigger
+  -> room_game_updates -> Supabase Realtime -> browser version signal
+  -> get-game-state -> allowlisted public GameView
+```
+
+Realtime never transports canonical GameState. `public.room_states` remains
+server-only and is not in the Realtime publication. The published
+`room_game_updates` row contains only `room_id`, `room_code`, `state_version`,
+and `updated_at`; authenticated members receive its updates through an
+RLS-protected, read-only subscription scoped to their current room.
+
+The browser treats a Realtime row only as notice that a newer canonical
+version may exist. It validates the room/version signal, compares it with the
+latest trusted version, and fetches the actual public state through the
+existing `get-game-state` Edge Function. Equal and older signals are ignored,
+bursts are coalesced, and successful `game-action` responses advance the
+trusted version immediately so the acting player's matching self-event is
+discarded. Reconnection performs one trusted catch-up read. There is no HTTP
+polling; **Refresh Game** remains the manual fallback when live sync is
+unavailable.
+
+Room subscriptions are established before the initial room read and are
+removed on room changes or route exit. This lets the version `0 -> 1` Start
+transition move every subscribed member from the lobby to the active game
+automatically. This milestone does not synchronize lobby membership, color,
+Ready, host changes, chat, or presence; those lobby views still use their
+existing manual **Refresh Players** behavior.
 
 Worship Me! retains its own rules contract, state schema, actions, validation,
 resolution queue, production and victory behavior, save schema, AI strategies,

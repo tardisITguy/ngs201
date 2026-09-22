@@ -9,8 +9,10 @@ import {createSetPlayerReadyAction,SetPlayerReadyError} from './rooms/setPlayerR
 import {createStartGameAction,StartGameError} from './rooms/startGame';
 import {createGetActiveGameStateAction,ActiveGameStateError} from './rooms/getActiveGameState';
 import {createSubmitGameAction,GameActionError} from './rooms/submitGameAction';
+import {createRoomGameSyncCoordinator} from './rooms/roomGameSync';
+import {subscribeRoomGameUpdates} from './rooms/subscribeRoomGameUpdates';
 import {describeBlessEdgeOption} from './rooms/blessEdgeOptionLabel';
-import type {ActiveGameStateResult} from './types';
+import type {ActiveGameStateResult,RoomGameSyncStatus} from './types';
 import type {WorshipMeBrowserCommand} from '../games/worship-me/trustedGameCommand';
 import {getLobby} from './rooms/lobby';
 import {renderLobbyPlayerRows} from './rooms/lobbyPlayerRows';
@@ -36,11 +38,24 @@ export function startPlayShell(root:HTMLDivElement){
  const start=createStartGameAction();
  const getGameState=createGetActiveGameStateAction();
  const submitGame=createSubmitGameAction();
+ let syncStatus:RoomGameSyncStatus='unavailable',lastSyncError:unknown;
+ const syncLabel=()=>syncStatus==='live'?'LIVE SYNC':syncStatus==='connecting'?'CONNECTING…':'LIVE SYNC UNAVAILABLE · USE REFRESH';
+ const updateSyncStatus=()=>root.querySelectorAll<HTMLElement>('[data-sync-status]').forEach(element=>{element.textContent=syncLabel();element.dataset.syncState=syncStatus;});
+ const roomSync=createRoomGameSyncCoordinator({
+  onState:result=>renderActiveGameState(result.roomCode,result),
+  onStatus:status=>{syncStatus=status;updateSyncStatus();},
+  onError:error=>{lastSyncError=error;const message=root.querySelector<HTMLElement>('.active-game [data-game-message]');if(message)message.textContent=error instanceof ActiveGameStateError?error.message:'Unable to refresh game.';},
+ },{fetchState:request=>getGameState(request),subscribe:options=>subscribeRoomGameUpdates(options)});
  let identityReturnPath:string|undefined;
  const router=createRouter(window,route=>void render(route));
  root.addEventListener('click',event=>{const link=(event.target as Element).closest<HTMLAnchorElement>('a[data-link]');if(link){event.preventDefault();router.navigate(new URL(link.href).pathname);}});
 
  async function render(route:Route){
+  if(route.name==='room'){
+   root.innerHTML=page(`<section class="lobby"><div class="status-panel" role="status"><span class="spinner"></span> Connecting to room…</div></section>`,true);
+   await roomSync.enter(route.code);if(!roomSync.isCurrent(route.code))return;return renderLobby(route.code);
+  }
+  void roomSync.leave();
   if(route.name==='identity')return renderIdentity();
   if(route.name==='games')return renderGames();
   if(route.name==='worship-me')return renderGameLanding();
@@ -48,7 +63,6 @@ export function startPlayShell(root:HTMLDivElement){
    if(!getDisplayName()){identityReturnPath='/games/worship-me/join';router.navigate('/');return;}
    return renderJoin();
   }
-  if(route.name==='room')return renderLobby(route.code);
   root.innerHTML=page(`<section class="panel centered"><p class="eyebrow">404</p><h1>Page not found</h1><a class="text-link" href="/" data-link>Return home</a></section>`);
  }
 
@@ -87,9 +101,12 @@ export function startPlayShell(root:HTMLDivElement){
  }
 
  async function renderLobby(code:string,lobbyNotice=''){
+  if(!roomSync.isCurrent(code))return;
   root.innerHTML=page(`<section class="lobby"><div class="status-panel" role="status"><span class="spinner"></span> Loading room…</div></section>`,true);
   try{
    const lobby=await getLobby(code);
+   if(!roomSync.isCurrent(code))return;roomSync.markInitialFetchComplete();
+   if(roomSync.latestTrustedVersion>0)return;
    if(lobby.room.status==='active'){
     return renderActiveGame(lobby.room.code);
    }
@@ -101,7 +118,7 @@ export function startPlayShell(root:HTMLDivElement){
    const nameRoom=lobby.room.isCurrentUserHost?'<button class="secondary-button compact future-control" type="button" disabled aria-describedby="name-room-status">Name Room <small id="name-room-status">COMING NEXT</small></button>':'';
    const startGame=lobby.room.isCurrentUserHost?`<button class="primary-button compact" type="button" data-start ${allReadyPreview?'':'disabled'}>START GAME <small>${allReadyPreview?'':'WAITING FOR ALL PLAYERS'}</small></button>`:'';
    const readyHelp=!currentPlayer?.isReady&&!canReady?'<span class="ready-help" id="ready-help">Choose a color first</span>':'';
-   root.querySelector('.lobby')!.innerHTML=`<section class="lobby-controls" aria-labelledby="lobby-controls-heading"><h1 id="lobby-controls-heading">LOBBY CONTROLS</h1><div class="lobby-controls__bar"><div class="lobby-controls__room"><span class="lobby-controls__label">ROOM</span><strong class="lobby-controls__code">${escapeHtml(lobby.room.code)}</strong><button class="secondary-button compact" type="button" data-copy>Copy Code</button>${nameRoom}</div><div class="lobby-controls__actions"><button class="secondary-button compact" type="button" data-leave>LEAVE LOBBY</button><span class="ready-control"><button class="secondary-button compact" type="button" data-ready ${!currentPlayer||(!currentPlayer.isReady&&!canReady)?'disabled':''} ${readyHelp?'aria-describedby="ready-help"':''}>${readyLabel}</button>${readyHelp}</span>${startGame}</div></div>${hostHelp}<div class="lobby-controls__messages"><p class="form-message" data-lobby-message aria-live="polite">${escapeHtml(lobbyNotice)}</p><p class="form-message" data-leave-message aria-live="polite"></p></div></section><section class="lobby-content-grid"><div class="panel players-panel"><div class="panel-title"><h2>PLAYERS</h2><button class="text-button" data-refresh>Refresh</button></div><ul class="player-list">${players||'<li>No players found.</li>'}</ul></div><div class="panel chat-panel"><h2>CHAT</h2><div class="chat-panel__placeholder"><p>Chat will appear here in the next multiplayer step.</p><span class="coming">COMING NEXT</span></div></div></section>`;
+   root.querySelector('.lobby')!.innerHTML=`<section class="lobby-controls" aria-labelledby="lobby-controls-heading"><div class="lobby-controls__heading"><h1 id="lobby-controls-heading">LOBBY CONTROLS</h1><span class="room-sync-status" data-sync-status data-sync-state="${syncStatus}">${syncLabel()}</span></div><div class="lobby-controls__bar"><div class="lobby-controls__room"><span class="lobby-controls__label">ROOM</span><strong class="lobby-controls__code">${escapeHtml(lobby.room.code)}</strong><button class="secondary-button compact" type="button" data-copy>Copy Code</button>${nameRoom}</div><div class="lobby-controls__actions"><button class="secondary-button compact" type="button" data-leave>LEAVE LOBBY</button><span class="ready-control"><button class="secondary-button compact" type="button" data-ready ${!currentPlayer||(!currentPlayer.isReady&&!canReady)?'disabled':''} ${readyHelp?'aria-describedby="ready-help"':''}>${readyLabel}</button>${readyHelp}</span>${startGame}</div></div>${hostHelp}<div class="lobby-controls__messages"><p class="form-message" data-lobby-message aria-live="polite">${escapeHtml(lobbyNotice)}</p><p class="form-message" data-leave-message aria-live="polite"></p></div></section><section class="lobby-content-grid"><div class="panel players-panel"><div class="panel-title"><h2>PLAYERS</h2><button class="text-button" data-refresh>Refresh</button></div><ul class="player-list">${players||'<li>No players found.</li>'}</ul></div><div class="panel chat-panel"><h2>CHAT</h2><div class="chat-panel__placeholder"><p>Chat will appear here in the next multiplayer step.</p><span class="coming">COMING NEXT</span></div></div></section>`;
    root.querySelector<HTMLButtonElement>('[data-refresh]')!.onclick=()=>void renderLobby(code);
    const copy=root.querySelector<HTMLButtonElement>('[data-copy]')!;
    copy.onclick=async()=>{try{await navigator.clipboard.writeText(lobby.room.code);copy.textContent='Copied!';}catch{copy.textContent='Copy unavailable';}};
@@ -128,20 +145,22 @@ export function startPlayShell(root:HTMLDivElement){
    const startButton=root.querySelector<HTMLButtonElement>('[data-start]');
    if(startButton)startButton.onclick=async()=>{
     startButton.disabled=true;startButton.textContent='STARTING GAME…';lobbyMessage.textContent='Starting game...';
-    try{await start({roomCode:lobby.room.code});await renderLobby(code);}
+    try{const started=await start({roomCode:lobby.room.code});if(started)await roomSync.refresh();}
     catch(error){const message=error instanceof StartGameError?error.message:'Unable to start game.';await renderLobby(code,message);}
    };
-  }catch(error){const message=error instanceof Error?error.message:"You don't have access to this room.";root.querySelector('.lobby')!.innerHTML=`<section class="status-panel error"><h1>Room unavailable</h1><p>${escapeHtml(message)}</p><a class="text-link" href="/games" data-link>Back to Games</a></section>`;}
+  }catch(error){if(!roomSync.isCurrent(code))return;roomSync.markInitialFetchComplete();const message=error instanceof Error?error.message:"You don't have access to this room.";root.querySelector('.lobby')!.innerHTML=`<section class="status-panel error"><h1>Room unavailable</h1><p>${escapeHtml(message)}</p><a class="text-link" href="/games" data-link>Back to Games</a></section>`;}
  }
 
  async function renderActiveGame(code:string,showLoading=true){
+  if(!roomSync.isCurrent(code))return;
   const holder=root.querySelector<HTMLElement>('.lobby');if(!holder)return;
   if(showLoading)holder.innerHTML=`<div class="status-panel" role="status"><span class="spinner"></span> Loading game…</div>`;
-  try{const result=await getGameState({roomCode:code});if(result)renderActiveGameState(code,result);}
-  catch(error){const message=error instanceof ActiveGameStateError?error.message:'Game state is unavailable';holder.innerHTML=`<section class="status-panel error"><h1>Game unavailable</h1><p>${escapeHtml(message)}</p><button class="primary-button" type="button" data-retry-game>TRY AGAIN</button></section>`;holder.querySelector<HTMLButtonElement>('[data-retry-game]')!.onclick=()=>void renderActiveGame(code);}
+  lastSyncError=undefined;const result=await roomSync.refresh();if(result||!roomSync.isCurrent(code)||holder.querySelector('.active-game'))return;
+  const message=lastSyncError instanceof ActiveGameStateError?lastSyncError.message:'Game state is unavailable';holder.innerHTML=`<section class="status-panel error"><h1>Game unavailable</h1><p>${escapeHtml(message)}</p><button class="primary-button" type="button" data-retry-game>TRY AGAIN</button></section>`;holder.querySelector<HTMLButtonElement>('[data-retry-game]')!.onclick=()=>void renderActiveGame(code);
  }
 
  function renderActiveGameState(code:string,result:ActiveGameStateResult){
+  if(!roomSync.isCurrent(code)||result.stateVersion<roomSync.latestTrustedVersion)return;
   const holder=root.querySelector<HTMLElement>('.lobby');if(!holder)return;
   type Mode='blessTile'|'smiteTile'|'blessEdge'|'smiteEdge';
   let mode:Mode|undefined,startCell:string|undefined,endCell:string|undefined,submitting=false,notice='';
@@ -149,9 +168,10 @@ export function startPlayShell(root:HTMLDivElement){
 
   const send=async(command:WorshipMeBrowserCommand)=>{
    if(submitting)return;submitting=true;notice='Submitting action…';paint();
-   try{const next=await submitGame({roomCode:code,expectedStateVersion:result.stateVersion,command});if(next){renderActiveGameState(code,next);return;}}
+   try{const next=await submitGame({roomCode:code,expectedStateVersion:result.stateVersion,command});if(next){roomSync.acceptTrusted(next);return;}}
    catch(error){notice=error instanceof GameActionError?error.message:'Unable to update game.';}
    finally{submitting=false;}
+   if(!roomSync.isCurrent(code)||result.stateVersion<roomSync.latestTrustedVersion)return;
    mode=undefined;startCell=undefined;endCell=undefined;paint();
   };
 
@@ -167,8 +187,8 @@ export function startPlayShell(root:HTMLDivElement){
     else controls=`<section class="panel active-game__actions"><p>Waiting for ${escapeHtml(playerName(pending.playerId))} to resolve ${pending.type==='blessEdgeMove'?'Bless Edge':'Smite'}.</p></section>`;}
    else if(view.phase!=='gameOver')controls=`<section class="panel active-game__actions"><p>Waiting for ${escapeHtml(playerName(view.currentPlayerId))}.</p></section>`;
    else controls=`<section class="panel active-game__actions"><h2>GAME OVER</h2><p>${view.winnerId?`${escapeHtml(playerName(view.winnerId))} wins.`:'The game has ended.'}</p></section>`;
-   holder.innerHTML=`<section class="active-game"><div class="panel active-game__status"><div class="active-game__status-top"><div><p class="eyebrow">WORSHIP ME!</p><h1>ROOM ${escapeHtml(result.roomCode)}</h1><span class="active-game__version">STATE VERSION ${result.stateVersion}</span></div><button class="primary-button compact" type="button" data-refresh-game ${submitting?'disabled':''}>REFRESH GAME</button></div><div class="active-game__turns"><p>Round ${view.round} · ${escapeHtml(view.phase)} · ${direction}</p><p>Current Turn: <strong>${escapeHtml(current?.name??view.currentPlayerId)} · ${escapeHtml(current?.color??'Unknown')}</strong></p><p>You: <strong>${escapeHtml(viewer?.name??result.viewerPlayerId)} · ${escapeHtml(viewer?.color??'Unknown')}</strong></p></div><p class="form-message" data-game-message aria-live="polite">${escapeHtml(notice)}</p></div>${controls}<div class="active-game__board-scroll"><div class="multiplayer-board">${renderBoard(view,{start:startCell,end:endCell},{interactive:canPlace})}</div></div><section class="panel active-game__players"><h2>PLAYERS</h2><ol>${players}</ol></section><p class="active-game__readonly">TRUSTED MULTIPLAYER · MANUAL REFRESH</p></section>`;
-   const refresh=holder.querySelector<HTMLButtonElement>('[data-refresh-game]')!;refresh.onclick=async()=>{if(submitting)return;refresh.disabled=true;refresh.textContent='REFRESHING…';await renderActiveGame(code,false);};
+   holder.innerHTML=`<section class="active-game"><div class="panel active-game__status"><div class="active-game__status-top"><div><p class="eyebrow">WORSHIP ME!</p><h1>ROOM ${escapeHtml(result.roomCode)}</h1><span class="active-game__version">STATE VERSION ${result.stateVersion}</span><span class="room-sync-status" data-sync-status data-sync-state="${syncStatus}">${syncLabel()}</span></div><button class="primary-button compact" type="button" data-refresh-game ${submitting?'disabled':''}>REFRESH GAME</button></div><div class="active-game__turns"><p>Round ${view.round} · ${escapeHtml(view.phase)} · ${direction}</p><p>Current Turn: <strong>${escapeHtml(current?.name??view.currentPlayerId)} · ${escapeHtml(current?.color??'Unknown')}</strong></p><p>You: <strong>${escapeHtml(viewer?.name??result.viewerPlayerId)} · ${escapeHtml(viewer?.color??'Unknown')}</strong></p></div><p class="form-message" data-game-message aria-live="polite">${escapeHtml(notice)}</p></div>${controls}<div class="active-game__board-scroll"><div class="multiplayer-board">${renderBoard(view,{start:startCell,end:endCell},{interactive:canPlace})}</div></div><section class="panel active-game__players"><h2>PLAYERS</h2><ol>${players}</ol></section><p class="active-game__readonly">TRUSTED MULTIPLAYER · REALTIME VERSION SIGNALS</p></section>`;
+   const refresh=holder.querySelector<HTMLButtonElement>('[data-refresh-game]')!;refresh.onclick=async()=>{if(submitting)return;refresh.disabled=true;refresh.textContent='REFRESHING…';lastSyncError=undefined;await roomSync.refresh();if(document.body.contains(refresh)){refresh.disabled=false;refresh.textContent='REFRESH GAME';}};
    holder.querySelectorAll<HTMLButtonElement>('[data-game-mode]').forEach(button=>button.onclick=()=>{mode=button.dataset.gameMode as Mode;startCell=undefined;endCell=undefined;notice='';paint();});
    holder.querySelectorAll<HTMLButtonElement>('[data-cell]').forEach(cell=>cell.onclick=()=>{if(!canPlace||submitting)return;if(!mode){notice='Choose an action first.';paint();return;}const id=cell.dataset.cell!;if(mode==='blessTile'||mode==='smiteTile'){void send({type:'placeTile',kind:mode==='blessTile'?'bless':'smite',cellId:id});return;}if(!startCell){startCell=id;notice='';paint();return;}if(!endCell&&id!==startCell){endCell=id;notice='Confirm the selected edge.';paint();}});
    const end=holder.querySelector<HTMLButtonElement>('[data-end-turn]');if(end)end.onclick=()=>void send({type:'endTurn'});

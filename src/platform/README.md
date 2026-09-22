@@ -30,7 +30,7 @@ Hostinger: play.newgamestudios.com (static NGS Play Vite app)
 ```
 
 GitHub remains source of truth. Supabase supplies Auth, database, Edge
-Functions, and future Realtime. `ngsllc-dev` is the current development
+Functions, and safe game-version Realtime. `ngsllc-dev` is the current development
 backend. Until `ngsllc-prod` exists, `play.newgamestudios.com` is an unlinked
 development/test deployment.
 
@@ -111,8 +111,8 @@ room. Rejoining with the same authenticated user is idempotent; it refreshes
 the validated display name and `last_seen_at` without consuming another slot.
 
 After membership exists, existing RLS permits that user to read the room and
-its `room_players`. `room_states` remains server-only. Realtime is deferred;
-the joining player loads the lobby immediately and the host uses **Refresh
+its `room_players`. `room_states` remains server-only. Lobby-state Realtime is
+deferred; the joining player loads the lobby immediately and the host uses **Refresh
 Players** to see the new member.
 
 ## Lobby lifecycle
@@ -214,7 +214,7 @@ excludes face-down `hiddenKind`, `seed`, `rngState`, `removedVillageTiles`,
 Persisted `turn_order` derives `viewerPlayerId` (`0` to `p1`, `1` to `p2`,
 etc.), while the projection supplies canonical `currentPlayerId` and the
 response supplies canonical `stateVersion`. Manual **Refresh Game** remains
-available and Realtime is deferred to Milestone 9.
+available as a fallback to live synchronization.
 
 ## Trusted gameplay actions
 
@@ -234,5 +234,33 @@ state.
 
 The browser never computes or submits the authoritative next state. Pending
 Bless Edge and Smite choices are exposed through a narrow allowlisted public
-DTO without internal queue indices. Other players continue to refresh
-manually; there is no polling or Realtime subscription.
+DTO without internal queue indices.
+
+## Safe Realtime game synchronization
+
+```text
+canonical room_states -> trusted DB mutation -> safe version-signal trigger
+  -> room_game_updates -> Supabase Realtime -> browser version signal
+  -> get-game-state -> allowlisted public GameView
+```
+
+Realtime never transports canonical GameState. `room_states` remains absent
+from the Realtime publication and inaccessible to browser roles. The published
+`room_game_updates` table carries only `room_id`, `room_code`, `state_version`,
+and `updated_at`; RLS permits authenticated members to read only their rooms,
+and browser roles receive no write privileges.
+
+The room subscription starts before the initial room fetch and listens only to
+UPDATE events for the normalized current room code. A signal is not rendered
+as state: it prompts the existing `get-game-state` trusted read when its
+version is newer than the latest trusted response. Equal/older versions are
+ignored, bursts are coalesced, successful action responses suppress matching
+self-events, reconnects perform a trusted catch-up, and room changes dispose
+the old channel. There is no polling. **Refresh Game** remains available when
+live sync is unavailable.
+
+The `0 -> 1` Start signal automatically moves subscribed members from the
+lobby to the active game. Gameplay version changes likewise refresh other
+members automatically. Lobby joins/leaves, host transfer, colors, Ready,
+chat, and presence are not synchronized by this channel; existing lobby
+**Refresh Players** behavior remains intentional.

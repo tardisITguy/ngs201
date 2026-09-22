@@ -2,6 +2,7 @@
 .lobby{display:grid;gap:14px}
 .lobby-controls{padding:15px 18px 12px;border:1px solid #ffffff18;border-radius:14px;background:linear-gradient(145deg,#292521,#141414);box-shadow:0 14px 36px #0008,inset 0 1px #ffffff0c}
 .lobby-controls h1{margin:0 0 10px;color:#d7aa7e;font-size:.75rem;letter-spacing:.18em}
+.lobby-controls__heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.lobby-controls__heading h1{margin:0 0 10px}
 .lobby-controls__bar{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .lobby-controls__room,.lobby-controls__actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 .lobby-controls__actions{justify-content:flex-end}

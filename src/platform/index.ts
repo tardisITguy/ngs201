@@ -1,4 +1,4 @@
-export type {ActiveGameStateRequest,ActiveGameStateResult,CreateRoomRequest,CreateRoomResult,GameRecord,JoinRoomRequest,JoinRoomResult,LeaveRoomRequest,LeaveRoomResult,RoomPlayerRecord,RoomRecord,RoomStateRecord,SetPlayerColorRequest,SetPlayerColorResult,SetPlayerReadyRequest,SetPlayerReadyResult,StartGameRequest,StartGameResult,SubmitGameActionRequest,SubmitGameActionResult} from './types';
+export type {ActiveGameStateRequest,ActiveGameStateResult,CreateRoomRequest,CreateRoomResult,GameRecord,JoinRoomRequest,JoinRoomResult,LeaveRoomRequest,LeaveRoomResult,RoomGameSyncStatus,RoomGameVersionSignal,RoomPlayerRecord,RoomRecord,RoomStateRecord,SetPlayerColorRequest,SetPlayerColorResult,SetPlayerReadyRequest,SetPlayerReadyResult,StartGameRequest,StartGameResult,SubmitGameActionRequest,SubmitGameActionResult} from './types';
 export type {WorshipMeBrowserCommand} from '../games/worship-me/trustedGameCommand';
 export {ensureAnonymousSession,PlatformAuthError,type AuthenticatedPlatformSession} from './auth/session';
 export {createRoom,CreateRoomError} from './rooms/createRoom';
@@ -9,6 +9,8 @@ export {createSetPlayerReadyAction,setPlayerReady,SetPlayerReadyError} from './r
 export {createStartGameAction,startGame,StartGameError} from './rooms/startGame';
 export {createGetActiveGameStateAction,getActiveGameState,ActiveGameStateError} from './rooms/getActiveGameState';
 export {createSubmitGameAction,submitGameAction,GameActionError} from './rooms/submitGameAction';
+export {subscribeRoomGameUpdates,type RoomGameUpdateSubscription,type SubscribeRoomGameUpdatesOptions} from './rooms/subscribeRoomGameUpdates';
+export {createRoomGameSyncCoordinator,type RoomGameSyncCallbacks,type RoomGameSyncCoordinator,type RoomGameSyncDependencies} from './rooms/roomGameSync';
 export {getSupabaseClient} from './supabase/client';
 export {listActiveGames,GamesCatalogError,type CatalogGame} from './games/catalog';
 export {getLobby,LobbyReadError,type Lobby,type LobbyPlayer} from './rooms/lobby';
