@@ -1,4 +1,4 @@
-import {adjacent,edgeKey,findCell,traversable} from './board';import type {EdgePlacement,GameState,PlacementAction,TilePlacement} from './types';
+import {adjacent,edgeKey,findCell,traversable} from './board.ts';import type {EdgePlacement,GameState,PlacementAction,TilePlacement} from './types.ts';
 const player=(s:GameState,id:string)=>s.players.find(p=>p.id===id)!;
 function opponentPriest(s:GameState,cellId:string,playerId:string){const c=findCell(s.board,cellId),color=player(s,playerId).color;return c.priests.some(x=>x!==color)}
 function incidentEdgeClaims(s:GameState,cellId:string){return Object.entries(s.edgeClaims).filter(([key])=>key.split('|').includes(cellId)).map(([,v])=>v)}

@@ -1,4 +1,4 @@
-import type {Cell,GameState} from './types';
+import type {Cell,GameState} from './types.ts';
 type CapacityState={players:readonly unknown[]};
 export function tileCapacity(s:CapacityState,c:Cell){return c.visibleKind==='square'?s.players.length+2:c.visibleKind==='hidden'?0:4}
 export function remainingCapacity(s:CapacityState,c:Cell){return Math.max(0,tileCapacity(s,c)-c.villagers.length-c.priests.length)}

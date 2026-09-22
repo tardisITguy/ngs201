@@ -1,6 +1,6 @@
-import type {GameState,VillagerColor} from './types';
-import {draw} from './rng';import {colorsOn,occupancy} from './priests';import {addPawnToBag} from './neutrals';
-import {remainingCapacity} from './capacity';
+import type {GameState,VillagerColor} from './types.ts';
+import {draw} from './rng.ts';import {colorsOn,occupancy} from './priests.ts';import {addPawnToBag} from './neutrals.ts';
+import {remainingCapacity} from './capacity.ts';
 export interface HomeBirthOutcome{cellId:string;homeProductionTriggered:true;bagContribution:VillagerColor[];entryAttempted:boolean;drawn?:VillagerColor;enteredBoard:boolean;blockedReason?:'village-square-full'}
 export function resolveHomeBirths(s:GameState){
  s.phase='homeBirths';const homes=s.board.filter(c=>c.visibleKind==='home'&&c.tileModifier?.kind!=='smite'&&occupancy(c)===2&&c.bread>=s.config.homeBreadCost),outcomes:HomeBirthOutcome[]=[];

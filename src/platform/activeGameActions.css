@@ -1,0 +1,10 @@
+.active-game__actions{padding:14px 18px}
+.active-game__actions h2{margin:0 0 10px;font-size:.8rem;letter-spacing:.14em}
+.active-game__actions p{margin:8px 0 0;color:var(--ngs-muted)}
+.active-game__action-buttons,.active-game__decision-list,.active-game__confirm{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.active-game__actions .secondary-button{width:auto;min-height:42px;padding:9px 13px}
+.active-game__actions .secondary-button.selected{border-color:#d7aa7e;background:#91694733;color:#fff}
+.multiplayer-board button.cell{cursor:pointer}
+.multiplayer-board button.cell:hover,.multiplayer-board button.cell:focus-visible{border-color:#d7aa7e;box-shadow:0 0 0 3px #d7aa7e55}
+.multiplayer-board .cell.selected{outline:4px solid #d7aa7e;outline-offset:-5px}
+@media(max-width:700px){.active-game__action-buttons>*{flex:1 1 130px}}

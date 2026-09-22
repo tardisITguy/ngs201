@@ -73,6 +73,7 @@ describe('Lobby lifecycle migration',()=>{
    '20260920000003_player_ready_state.sql',
    '20260920000004_start_game.sql',
    '20260921000000_active_game_state_read.sql',
+   '20260921000001_gameplay_mutation.sql',
   ]);
  });
 

@@ -1,8 +1,8 @@
-import {edgeKey,findCell} from './board';
-import {remainingCapacity} from './capacity';
-import {countNeutralsInPlay,MAX_NEUTRALS_IN_PLAY} from './neutrals';
-import {occupancy} from './priests';
-import type {BlessEdgePlacement,Cell,GameState,MoveResolutionOption,TilePlacement} from './types';
+import {edgeKey,findCell} from './board.ts';
+import {remainingCapacity} from './capacity.ts';
+import {countNeutralsInPlay,MAX_NEUTRALS_IN_PLAY} from './neutrals.ts';
+import {occupancy} from './priests.ts';
+import type {BlessEdgePlacement,Cell,GameState,MoveResolutionOption,TilePlacement} from './types.ts';
 
 function hasOwn(c:Cell,color:string){return c.villagers.includes(color as never)||c.priests.includes(color as never)}
 function pawnOptions(s:GameState,pairs:[Cell,Cell][],color:string,kind:'own'|'neutral'|'opponent'){

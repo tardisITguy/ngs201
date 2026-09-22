@@ -294,8 +294,34 @@ Persisted `turn_order` maps to engine IDs (`0` to `p1`, `1` to `p2`, and so
 on), allowing the trusted response to identify `viewerPlayerId`.
 `currentPlayerId` comes from canonical `turnOrder[currentPlayerIndex]`, and
 the response carries canonical `stateVersion` without changing it. Refresh is
-manual only. Gameplay mutation is deferred to Milestone 8 and Realtime to
-Milestone 9.
+manual only; Realtime remains deferred to Milestone 9.
+
+### Trusted gameplay mutation
+
+```text
+Browser intent { roomCode, expectedStateVersion, command }
+  -> game-action Edge Function -> verified JWT -> trusted canonical read
+  -> derive viewer pN from persisted turn_order
+  -> existing applyAction() / resolvePendingDecision()
+  -> validate public projection -> commit_game_action_server
+  -> rooms lock -> membership/current-player check -> room_states lock
+  -> optimistic version check -> atomic state + version commit
+  -> browser-safe public projection
+```
+
+The browser never computes or submits an authoritative next state. It cannot
+choose a user/player ID, seed, roster, hidden data, or canonical state. The
+trusted Edge Function injects the authenticated engine player ID and delegates
+all legality, queue resolution, production, births, Priests, round changes,
+and victory behavior to the existing reducer.
+
+Every successful command increments `room_states.state_version` exactly once.
+The commit RPC locks `rooms` before `room_states`, compares the expected
+version, confirms the locked current player, and preserves setup identity such
+as seed, config, roster, turn order, and board structure. Stale commands fail
+without overwriting newer state. The public DTO exposes only an allowlisted
+pending choice and never canonical `pendingResolution` or its `queueIndex`.
+Other players still use **Refresh Game**; there is no polling or Realtime.
 
 Worship Me! retains its own rules contract, state schema, actions, validation,
 resolution queue, production and victory behavior, save schema, AI strategies,

@@ -8,6 +8,10 @@ import {createSetPlayerColorAction,SetPlayerColorError} from './rooms/setPlayerC
 import {createSetPlayerReadyAction,SetPlayerReadyError} from './rooms/setPlayerReady';
 import {createStartGameAction,StartGameError} from './rooms/startGame';
 import {createGetActiveGameStateAction,ActiveGameStateError} from './rooms/getActiveGameState';
+import {createSubmitGameAction,GameActionError} from './rooms/submitGameAction';
+import {describeBlessEdgeOption} from './rooms/blessEdgeOptionLabel';
+import type {ActiveGameStateResult} from './types';
+import type {WorshipMeBrowserCommand} from '../games/worship-me/trustedGameCommand';
 import {getLobby} from './rooms/lobby';
 import {renderLobbyPlayerRows} from './rooms/lobbyPlayerRows';
 import {renderBoard} from '../games/worship-me/ui/renderBoard';
@@ -15,6 +19,7 @@ import {defaultConfig} from '../games/worship-me/engine/config';
 import {WORSHIP_ME_PLAYER_COLORS} from '../games/worship-me/ui/playerColors';
 import './colorSelection.css';
 import './activeGame.css';
+import './activeGameActions.css';
 
 const escapeHtml=(value:string)=>value.replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]!));
 const logo=()=>`<a class="brand" href="/" data-link aria-label="New Game Studios home"><img src="/brand/ngs/bannerlogo.png" alt="New Game Studios"><span>THE FUTURE IS NEW</span></a>`;
@@ -30,6 +35,7 @@ export function startPlayShell(root:HTMLDivElement){
  const setReady=createSetPlayerReadyAction();
  const start=createStartGameAction();
  const getGameState=createGetActiveGameStateAction();
+ const submitGame=createSubmitGameAction();
  let identityReturnPath:string|undefined;
  const router=createRouter(window,route=>void render(route));
  root.addEventListener('click',event=>{const link=(event.target as Element).closest<HTMLAnchorElement>('a[data-link]');if(link){event.preventDefault();router.navigate(new URL(link.href).pathname);}});
@@ -131,14 +137,47 @@ export function startPlayShell(root:HTMLDivElement){
  async function renderActiveGame(code:string,showLoading=true){
   const holder=root.querySelector<HTMLElement>('.lobby');if(!holder)return;
   if(showLoading)holder.innerHTML=`<div class="status-panel" role="status"><span class="spinner"></span> Loading game…</div>`;
-  try{
-   const result=await getGameState({roomCode:code});if(!result)return;
-   const view=result.gameView,current=view.players.find(player=>player.id===view.currentPlayerId),viewer=view.players.find(player=>player.id===result.viewerPlayerId),direction=view.direction===1?'Clockwise':'Counterclockwise';
+  try{const result=await getGameState({roomCode:code});if(result)renderActiveGameState(code,result);}
+  catch(error){const message=error instanceof ActiveGameStateError?error.message:'Game state is unavailable';holder.innerHTML=`<section class="status-panel error"><h1>Game unavailable</h1><p>${escapeHtml(message)}</p><button class="primary-button" type="button" data-retry-game>TRY AGAIN</button></section>`;holder.querySelector<HTMLButtonElement>('[data-retry-game]')!.onclick=()=>void renderActiveGame(code);}
+ }
+
+ function renderActiveGameState(code:string,result:ActiveGameStateResult){
+  const holder=root.querySelector<HTMLElement>('.lobby');if(!holder)return;
+  type Mode='blessTile'|'smiteTile'|'blessEdge'|'smiteEdge';
+  let mode:Mode|undefined,startCell:string|undefined,endCell:string|undefined,submitting=false,notice='';
+  const playerName=(id:string)=>result.gameView.players.find(player=>player.id===id)?.name??id;
+
+  const send=async(command:WorshipMeBrowserCommand)=>{
+   if(submitting)return;submitting=true;notice='Submitting action…';paint();
+   try{const next=await submitGame({roomCode:code,expectedStateVersion:result.stateVersion,command});if(next){renderActiveGameState(code,next);return;}}
+   catch(error){notice=error instanceof GameActionError?error.message:'Unable to update game.';}
+   finally{submitting=false;}
+   mode=undefined;startCell=undefined;endCell=undefined;paint();
+  };
+
+  const paint=()=>{
+   const view=result.gameView,current=view.players.find(player=>player.id===view.currentPlayerId),viewer=view.players.find(player=>player.id===result.viewerPlayerId),direction=view.direction===1?'Clockwise':'Counterclockwise',pending=view.pendingDecision;
+   const canPlace=view.phase==='placement'&&view.currentPlayerId===result.viewerPlayerId&&!pending;
+   const canResolve=!!pending&&pending.playerId===result.viewerPlayerId;
    const players=view.players.map((player,index)=>`<li><strong>${index+1}. ${escapeHtml(player.name)}</strong><span>${escapeHtml(player.color)}</span>${player.id===view.currentPlayerId?'<small class="active-game__badge">CURRENT TURN</small>':''}${player.id===result.viewerPlayerId?'<small class="active-game__badge">YOU</small>':''}</li>`).join('');
-   holder.innerHTML=`<section class="active-game"><div class="panel active-game__status"><div class="active-game__status-top"><div><p class="eyebrow">WORSHIP ME!</p><h1>ROOM ${escapeHtml(result.roomCode)}</h1><span class="active-game__version">STATE VERSION ${result.stateVersion}</span></div><button class="primary-button compact" type="button" data-refresh-game>REFRESH GAME</button></div><div class="active-game__turns"><p>Round ${view.round} · ${escapeHtml(view.phase)} · ${direction}</p><p>Current Turn: <strong>${escapeHtml(current?.name??view.currentPlayerId)} · ${escapeHtml(current?.color??'Unknown')}</strong></p><p>You: <strong>${escapeHtml(viewer?.name??result.viewerPlayerId)} · ${escapeHtml(viewer?.color??'Unknown')}</strong></p></div><p class="form-message" data-game-message aria-live="polite"></p></div><div class="active-game__board-scroll"><div class="multiplayer-board">${renderBoard(view,{}, {interactive:false})}</div></div><section class="panel active-game__players"><h2>PLAYERS</h2><ol>${players}</ol></section><p class="active-game__readonly">READ ONLY · GAMEPLAY CONTROLS COMING NEXT</p></section>`;
-   const refresh=holder.querySelector<HTMLButtonElement>('[data-refresh-game]')!,message=holder.querySelector<HTMLElement>('[data-game-message]')!;
-   refresh.onclick=async()=>{refresh.disabled=true;refresh.textContent='REFRESHING…';message.textContent='';await renderActiveGame(code,false);};
-  }catch(error){const message=error instanceof ActiveGameStateError?error.message:'Game state is unavailable';holder.innerHTML=`<section class="status-panel error"><h1>Game unavailable</h1><p>${escapeHtml(message)}</p><button class="primary-button" type="button" data-retry-game>TRY AGAIN</button></section>`;holder.querySelector<HTMLButtonElement>('[data-retry-game]')!.onclick=()=>void renderActiveGame(code);}
+   let controls='';
+   if(canPlace){const edgeStarted=!!(mode&&(mode==='blessEdge'||mode==='smiteEdge')&&startCell),edgeConfirm=!!(edgeStarted&&endCell),modes:Array<{value:Mode;label:string}>=[{value:'blessTile',label:'BLESS TILE'},{value:'blessEdge',label:'BLESS EDGE'},{value:'smiteTile',label:'SMITE TILE'},{value:'smiteEdge',label:'SMITE EDGE'}];controls=`<section class="panel active-game__actions"><h2>GAME ACTIONS</h2><div class="active-game__action-buttons">${modes.map(item=>`<button type="button" class="secondary-button${mode===item.value?' selected':''}" data-game-mode="${item.value}" ${submitting?'disabled':''}>${item.label}</button>`).join('')}<button type="button" class="primary-button" data-end-turn ${submitting?'disabled':''}>END TURN</button></div>${mode?`<p>${mode.endsWith('Edge')?(startCell?endCell?`${escapeHtml(startCell)} → ${escapeHtml(endCell)}`:'Choose the second tile.':'Choose the first tile.'):'Choose a tile.'}</p>`:''}${edgeStarted?`<div class="active-game__confirm">${edgeConfirm?`<button type="button" class="primary-button" data-confirm-edge ${submitting?'disabled':''}>CONFIRM</button>`:''}<button type="button" class="secondary-button" data-cancel-action>CANCEL</button></div>`:''}</section>`;}
+   else if(pending){if(canResolve&&pending.type==='blessEdgeMove')controls=`<section class="panel active-game__actions"><h2>RESOLVE BLESS EDGE</h2><div class="active-game__decision-list">${pending.options.map((option,index)=>`<button type="button" class="secondary-button" data-bless-option="${index}" ${submitting?'disabled':''}>${escapeHtml(describeBlessEdgeOption(option))}</button>`).join('')}</div></section>`;
+    else if(canResolve&&pending.type==='smiteResource')controls=`<section class="panel active-game__actions"><h2>CHOOSE RESOURCE TO SMITE</h2><div class="active-game__action-buttons">${pending.options.map(resource=>`<button type="button" class="primary-button" data-smite-resource="${resource}" ${submitting?'disabled':''}>${resource.toUpperCase()}</button>`).join('')}</div></section>`;
+    else controls=`<section class="panel active-game__actions"><p>Waiting for ${escapeHtml(playerName(pending.playerId))} to resolve ${pending.type==='blessEdgeMove'?'Bless Edge':'Smite'}.</p></section>`;}
+   else if(view.phase!=='gameOver')controls=`<section class="panel active-game__actions"><p>Waiting for ${escapeHtml(playerName(view.currentPlayerId))}.</p></section>`;
+   else controls=`<section class="panel active-game__actions"><h2>GAME OVER</h2><p>${view.winnerId?`${escapeHtml(playerName(view.winnerId))} wins.`:'The game has ended.'}</p></section>`;
+   holder.innerHTML=`<section class="active-game"><div class="panel active-game__status"><div class="active-game__status-top"><div><p class="eyebrow">WORSHIP ME!</p><h1>ROOM ${escapeHtml(result.roomCode)}</h1><span class="active-game__version">STATE VERSION ${result.stateVersion}</span></div><button class="primary-button compact" type="button" data-refresh-game ${submitting?'disabled':''}>REFRESH GAME</button></div><div class="active-game__turns"><p>Round ${view.round} · ${escapeHtml(view.phase)} · ${direction}</p><p>Current Turn: <strong>${escapeHtml(current?.name??view.currentPlayerId)} · ${escapeHtml(current?.color??'Unknown')}</strong></p><p>You: <strong>${escapeHtml(viewer?.name??result.viewerPlayerId)} · ${escapeHtml(viewer?.color??'Unknown')}</strong></p></div><p class="form-message" data-game-message aria-live="polite">${escapeHtml(notice)}</p></div>${controls}<div class="active-game__board-scroll"><div class="multiplayer-board">${renderBoard(view,{start:startCell,end:endCell},{interactive:canPlace})}</div></div><section class="panel active-game__players"><h2>PLAYERS</h2><ol>${players}</ol></section><p class="active-game__readonly">TRUSTED MULTIPLAYER · MANUAL REFRESH</p></section>`;
+   const refresh=holder.querySelector<HTMLButtonElement>('[data-refresh-game]')!;refresh.onclick=async()=>{if(submitting)return;refresh.disabled=true;refresh.textContent='REFRESHING…';await renderActiveGame(code,false);};
+   holder.querySelectorAll<HTMLButtonElement>('[data-game-mode]').forEach(button=>button.onclick=()=>{mode=button.dataset.gameMode as Mode;startCell=undefined;endCell=undefined;notice='';paint();});
+   holder.querySelectorAll<HTMLButtonElement>('[data-cell]').forEach(cell=>cell.onclick=()=>{if(!canPlace||submitting)return;if(!mode){notice='Choose an action first.';paint();return;}const id=cell.dataset.cell!;if(mode==='blessTile'||mode==='smiteTile'){void send({type:'placeTile',kind:mode==='blessTile'?'bless':'smite',cellId:id});return;}if(!startCell){startCell=id;notice='';paint();return;}if(!endCell&&id!==startCell){endCell=id;notice='Confirm the selected edge.';paint();}});
+   const end=holder.querySelector<HTMLButtonElement>('[data-end-turn]');if(end)end.onclick=()=>void send({type:'endTurn'});
+   const confirm=holder.querySelector<HTMLButtonElement>('[data-confirm-edge]');if(confirm)confirm.onclick=()=>{if(!mode||!startCell||!endCell)return;void send(mode==='blessEdge'?{type:'placeEdge',kind:'bless',from:startCell,to:endCell}:{type:'placeEdge',kind:'smite',a:startCell,b:endCell});};
+   const cancel=holder.querySelector<HTMLButtonElement>('[data-cancel-action]');if(cancel)cancel.onclick=()=>{mode=undefined;startCell=undefined;endCell=undefined;notice='';paint();};
+   holder.querySelectorAll<HTMLButtonElement>('[data-bless-option]').forEach(button=>button.onclick=()=>void send({type:'resolveBlessEdge',optionIndex:Number(button.dataset.blessOption)}));
+   holder.querySelectorAll<HTMLButtonElement>('[data-smite-resource]').forEach(button=>button.onclick=()=>void send({type:'resolveSmiteResource',resource:button.dataset.smiteResource as 'wheat'|'bread'}));
+  };
+  paint();
  }
  router.start();
 }

@@ -37,7 +37,7 @@ describe('Set Player Ready browser client',()=>{
 describe('Ready migration and RPC contract',()=>{
  it('adds exactly one migration after player color without changing the old files',()=>{
   const names=readdirSync(new URL('../supabase/migrations/',import.meta.url),{withFileTypes:true}).filter(entry=>!entry.isDirectory()&&entry.name.endsWith('.sql')).map(entry=>entry.name).sort();
-  expect(names).toContain('20260920000003_player_ready_state.sql');expect(names).toHaveLength(9);
+  expect(names).toContain('20260920000003_player_ready_state.sql');expect(names).toContain('20260921000001_gameplay_mutation.sql');expect(names).toHaveLength(10);
  });
 
  it('uses invoker security, empty search path, and service-role-only execution',()=>{

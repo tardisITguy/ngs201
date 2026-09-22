@@ -213,6 +213,26 @@ excludes face-down `hiddenKind`, `seed`, `rngState`, `removedVillageTiles`,
 
 Persisted `turn_order` derives `viewerPlayerId` (`0` to `p1`, `1` to `p2`,
 etc.), while the projection supplies canonical `currentPlayerId` and the
-response supplies canonical `stateVersion`. The active page is read-only and
-updates only through the manual **Refresh Game** button. Gameplay mutation is
-deferred to Milestone 8 and Realtime to Milestone 9.
+response supplies canonical `stateVersion`. Manual **Refresh Game** remains
+available and Realtime is deferred to Milestone 9.
+
+## Trusted gameplay actions
+
+The browser submits only `{ roomCode, expectedStateVersion, command }` to the
+`game-action` Edge Function. The function verifies the JWT, reads canonical
+state through the existing service-only read RPC, derives `pN` from persisted
+`turn_order`, and passes the intent to the existing Worship Me! `applyAction()`
+or `resolvePendingDecision()` implementation.
+
+The resulting candidate is first checked through the browser-safe public
+projection, then committed by service-only `commit_game_action_server`. That
+RPC locks the room and canonical state in the established order, revalidates
+membership/current player and immutable setup structure, and performs a
+compare-and-swap on `state_version`. A successful action advances the version
+by exactly one; stale commands return a conflict and never overwrite newer
+state.
+
+The browser never computes or submits the authoritative next state. Pending
+Bless Edge and Smite choices are exposed through a narrow allowlisted public
+DTO without internal queue indices. Other players continue to refresh
+manually; there is no polling or Realtime subscription.

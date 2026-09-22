@@ -1,5 +1,5 @@
-import type {Cell,GameState,PlayerColor} from './types';
-import {remainingCapacity} from './capacity';
+import type {Cell,GameState,PlayerColor} from './types.ts';
+import {remainingCapacity} from './capacity.ts';
 export const occupancy=(c:Cell)=>c.villagers.length+c.priests.length;
 export const colorsOn=(c:Cell)=>([...c.villagers,...c.priests] as Array<PlayerColor|'neutral'>);
 export const hasPassiveBless=(c:Cell)=>(c.visibleKind==='farm'||c.visibleKind==='bakery')&&c.priests.length>0;
