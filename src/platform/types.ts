@@ -90,6 +90,8 @@ export interface ActiveGameStateResult {roomCode:string;status:'active';stateVer
 
 export interface RoomGameVersionSignal {roomCode:string;stateVersion:number}
 export type RoomGameSyncStatus='connecting'|'live'|'unavailable';
+export interface RoomLobbyVersionSignal {roomCode:string;lobbyVersion:number}
+export type RoomLobbySyncStatus=RoomGameSyncStatus;
 
 export interface SubmitGameActionRequest {roomCode:string;expectedStateVersion:number;command:WorshipMeBrowserCommand}
 export type SubmitGameActionResult=ActiveGameStateResult;

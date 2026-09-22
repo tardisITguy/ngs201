@@ -37,7 +37,7 @@ describe('Set Player Ready browser client',()=>{
 describe('Ready migration and RPC contract',()=>{
  it('adds exactly one migration after player color without changing the old files',()=>{
   const names=readdirSync(new URL('../supabase/migrations/',import.meta.url),{withFileTypes:true}).filter(entry=>!entry.isDirectory()&&entry.name.endsWith('.sql')).map(entry=>entry.name).sort();
-  expect(names).toContain('20260920000003_player_ready_state.sql');expect(names).toContain('20260921000001_gameplay_mutation.sql');expect(names).toContain('20260922000000_realtime_game_sync.sql');expect(names).toHaveLength(11);
+  expect(names).toContain('20260920000003_player_ready_state.sql');expect(names).toContain('20260921000001_gameplay_mutation.sql');expect(names).toContain('20260922000000_realtime_game_sync.sql');expect(names).toContain('20260922000001_realtime_lobby_sync.sql');expect(names).toHaveLength(12);
  });
 
  it('uses invoker security, empty search path, and service-role-only execution',()=>{
@@ -99,7 +99,7 @@ describe('Ready Edge Function and lobby UI',()=>{
  });
 
  it('uses a current-player-only Ready control, disables it without color, and refreshes on either outcome',()=>{
-  expect(shell).toContain('data-ready');expect(shell).toContain('Choose a color first');expect(shell).toContain("isReady:!currentPlayer.isReady");expect(shell).toContain('await setReady');expect(shell).toContain('await renderLobby(code)');expect(shell).toContain('await renderLobby(code,message)');
+  expect(shell).toContain('data-ready');expect(shell).toContain('Choose a color first');expect(shell).toContain("isReady:!currentPlayer.isReady");expect(shell).toContain('await setReady');expect(shell).toContain('await roomLobbySync.refresh()');expect(shell).toContain("pendingLobbyNotice=error instanceof SetPlayerReadyError");
  });
 
  it('previews Start eligibility from the authoritative engine minimum of two',()=>{

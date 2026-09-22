@@ -261,6 +261,33 @@ live sync is unavailable.
 
 The `0 -> 1` Start signal automatically moves subscribed members from the
 lobby to the active game. Gameplay version changes likewise refresh other
-members automatically. Lobby joins/leaves, host transfer, colors, Ready,
-chat, and presence are not synchronized by this channel; existing lobby
-**Refresh Players** behavior remains intentional.
+members automatically.
+
+## Safe Realtime lobby synchronization
+
+```text
+trusted lobby mutation -> rooms / room_players -> private version bump
+  -> room_lobby_updates -> Supabase Realtime -> browser version signal
+  -> getLobby() -> current RLS-protected lobby snapshot
+```
+
+The lobby signal contains no roster, host ID, colors, Ready state, or game
+state. `room_lobby_updates` contains only room identity, a server-incremented
+version, and timestamp. RLS permits authenticated room members to read that
+row; browser roles cannot write it. Neither `rooms`, `room_players`, nor
+`room_states` is published.
+
+The lobby coordinator uses the signal only to invoke the existing
+`getLobby()` read. It keeps one request in flight, captures the highest signal
+version when that request starts, and schedules one catch-up if a newer signal
+arrives before completion. Reconnection after a gap also performs one trusted
+catch-up. Route/room changes invalidate delayed reads and dispose both old
+subscriptions. No polling is used.
+
+While the lobby is shown, its compact status aggregates the separate game and
+lobby channels. Automatic refresh covers joins, leaves, display-name changes,
+colors, Ready, host transfer, abandonment, and activation. When the active
+game is established, lobby sync is removed and the game channel alone owns
+the active-game status. Manual **Refresh** remains available as a failure
+fallback. Milestone 11 will add server-authoritative AI players using these
+same database-triggered lobby signals.

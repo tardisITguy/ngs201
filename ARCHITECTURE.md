@@ -348,9 +348,36 @@ unavailable.
 Room subscriptions are established before the initial room read and are
 removed on room changes or route exit. This lets the version `0 -> 1` Start
 transition move every subscribed member from the lobby to the active game
-automatically. This milestone does not synchronize lobby membership, color,
-Ready, host changes, chat, or presence; those lobby views still use their
-existing manual **Refresh Players** behavior.
+automatically.
+
+### Safe Realtime lobby synchronization
+
+```text
+trusted lobby mutation -> rooms / room_players -> private version bump
+  -> room_lobby_updates -> Supabase Realtime -> browser version signal
+  -> existing RLS-protected getLobby() -> refreshed lobby
+```
+
+Realtime does not transport the player roster or canonical game state. The
+published `room_lobby_updates` row contains only room ID, room code, a
+monotonic lobby version, and its timestamp. Authenticated members can select
+the signal row through RLS but cannot write it. `rooms`, `room_players`, and
+`room_states` remain outside the Realtime publication.
+
+The lobby and game channels are separate version signals. While a lobby is
+visible, the UI reports healthy live synchronization only when both channels
+are live: lobby signals refresh joins, leaves, display names, colors, Ready,
+host transfer, and status through `getLobby()`, while the game signal detects
+Start. Once an active GameView is rendered, lobby sync is removed and only
+game synchronization drives the active indicator.
+
+Fetches are single-flight. Each lobby fetch captures the highest signal
+version known when it begins and marks only that captured version handled. A
+newer signal received in flight therefore causes one catch-up fetch. A
+connection gap similarly causes one trusted catch-up after recovery. There is
+no polling, and manual **Refresh** remains available if Realtime is down.
+Milestone 11 will add server-authoritative AI lobby participants on top of
+this generic synchronized-lobby foundation.
 
 Worship Me! retains its own rules contract, state schema, actions, validation,
 resolution queue, production and victory behavior, save schema, AI strategies,

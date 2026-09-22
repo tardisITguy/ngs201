@@ -47,7 +47,7 @@ describe('Set Player Color browser client',()=>{
 });
 
 describe('player color migration and RPC',()=>{
- it('retains the player-color migration in history',()=>{const names=readdirSync(new URL('../supabase/migrations/',import.meta.url),{withFileTypes:true}).filter(entry=>!entry.isDirectory()&&entry.name.endsWith('.sql')).map(entry=>entry.name).sort();expect(names).toContain('20260920000002_player_color_selection.sql');expect(names).toContain('20260921000001_gameplay_mutation.sql');expect(names).toContain('20260922000000_realtime_game_sync.sql');expect(names).toHaveLength(11);});
+ it('retains the player-color migration in history',()=>{const names=readdirSync(new URL('../supabase/migrations/',import.meta.url),{withFileTypes:true}).filter(entry=>!entry.isDirectory()&&entry.name.endsWith('.sql')).map(entry=>entry.name).sort();expect(names).toContain('20260920000002_player_color_selection.sql');expect(names).toContain('20260921000001_gameplay_mutation.sql');expect(names).toContain('20260922000000_realtime_game_sync.sql');expect(names).toContain('20260922000001_realtime_lobby_sync.sql');expect(names).toHaveLength(12);});
 
  it('creates server-only normalized game color metadata seeded with exact colors',()=>{
   expect(migration).toContain('create table public.game_player_colors');
@@ -128,8 +128,8 @@ describe('Set Player Color Edge Function and lobby UI',()=>{
   expect(shell).not.toContain('Choose color');expect(shell).not.toContain('color-panel');expect(shell).not.toContain('data-clear-color');
   expect(shell).toContain('data-player-color-select');expect(shell).toContain('data-lobby-message');
   expect(shell).toContain('await setColor({roomCode:lobby.room.code,playerColor})');
-  expect(shell).toContain('await renderLobby(code)');
-  expect(shell).toContain('await renderLobby(code,message)');
+  expect(shell).toContain('await roomLobbySync.refresh()');
+  expect(shell).toContain("pendingLobbyNotice=error instanceof SetPlayerColorError");
   expect(shell).toContain('colorControl.disabled=true');
  });
 
