@@ -1,7 +1,7 @@
-import {blessEdgeOptions} from '../engine/resolution';
-import {occupancy} from '../engine/priests';
-import {remainingCapacity} from '../engine/capacity';
-import type {BotStrategy,Cell,GameAction,GameState,MoveResolutionOption,Player,ScoreComponents} from '../engine/types';
+import {blessEdgeOptions} from '../engine/resolution.ts';
+import {occupancy} from '../engine/priests.ts';
+import {remainingCapacity} from '../engine/capacity.ts';
+import type {BotStrategy,Cell,GameAction,GameState,MoveResolutionOption,Player,ScoreComponents} from '../engine/types.ts';
 
 export interface StrategyWeights{populationGrowth:number;resourceEconomy:number;templeProgress:number;templePreservation:number;priestProgress:number;productionEnhancement:number;opponentDisruption:number;mobility:number;exploration:number}
 export const weights:Record<Exclude<BotStrategy,'random'>,StrategyWeights>={

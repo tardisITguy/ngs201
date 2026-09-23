@@ -1,6 +1,7 @@
 /** Generic NGSLLC platform records exposed to authenticated clients. */
 import type {WorshipMePublicGameView} from '../games/worship-me/publicGameView';
 import type {WorshipMeBrowserCommand} from '../games/worship-me/trustedGameCommand';
+import type {BotStrategy} from '../games/worship-me/engine/types';
 export interface GameRecord {
  id:string;
  slug:string;
@@ -40,6 +41,8 @@ export interface RoomPlayerRecord {
  joined_at:string;
  last_seen_at:string;
 }
+
+export interface RoomAIPlayerRecord {id:string;room_id:string;bot_number:number;player_color:string;bot_strategy:BotStrategy;turn_order:number|null;created_at:string;updated_at:string}
 
 export interface CreateRoomRequest {
  gameSlug:string;
@@ -95,3 +98,13 @@ export type RoomLobbySyncStatus=RoomGameSyncStatus;
 
 export interface SubmitGameActionRequest {roomCode:string;expectedStateVersion:number;command:WorshipMeBrowserCommand}
 export type SubmitGameActionResult=ActiveGameStateResult;
+
+export type ManageAIPlayerCommand=
+ |{type:'addAI'}
+ |{type:'removeAI';aiPlayerId:string}
+ |{type:'setAIColor';aiPlayerId:string;playerColor:string}
+ |{type:'setAIStrategy';aiPlayerId:string;botStrategy:BotStrategy};
+export interface ManageAIPlayerRequest{roomCode:string;command:ManageAIPlayerCommand}
+export interface ManageAIPlayerResult{roomCode:string}
+export interface AdvanceAIRequest{roomCode:string}
+export type AdvanceAIResult=ActiveGameStateResult;

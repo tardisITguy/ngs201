@@ -21,3 +21,9 @@ verify_jwt = true
 
 [functions.game-action]
 verify_jwt = true
+
+[functions.manage-ai-player]
+verify_jwt = true
+
+[functions.advance-ai]
+verify_jwt = true

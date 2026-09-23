@@ -35,6 +35,10 @@
 .ready-badge{min-width:76px;padding:5px 7px;border:1px solid #ffffff1f;border-radius:999px;text-align:center;font-size:.6rem;font-weight:900;letter-spacing:.08em}
 .ready-badge.is-ready{border-color:#62a36d77;background:#62a36d20;color:#a7d8ae}
 .ready-badge.is-not-ready{color:var(--ngs-muted);background:#ffffff08}
+.ai-badge{padding:5px 7px;border:1px solid #b27a4f66;border-radius:999px;background:#91694724;color:#e0bd98;font-size:.6rem;font-weight:900;letter-spacing:.1em}
+.ai-strategy-select{min-height:38px;padding:7px 28px 7px 9px;border:1px solid #ffffff20;border-radius:8px;color:var(--ngs-text);background:#161616;color-scheme:dark}
+.ai-strategy-readonly{min-width:92px;color:var(--ngs-muted);font-size:.85rem}
+.ai-remove{white-space:nowrap}
 .active-game-placeholder{max-width:720px;margin:0 auto;padding:30px}
 .active-game-placeholder h1{margin:.2em 0 0;font-size:clamp(2rem,5vw,3.6rem)}
 .active-player-list{list-style:none;padding:0;margin:18px 0}

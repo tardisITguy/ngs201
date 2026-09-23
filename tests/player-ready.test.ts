@@ -37,7 +37,7 @@ describe('Set Player Ready browser client',()=>{
 describe('Ready migration and RPC contract',()=>{
  it('adds exactly one migration after player color without changing the old files',()=>{
   const names=readdirSync(new URL('../supabase/migrations/',import.meta.url),{withFileTypes:true}).filter(entry=>!entry.isDirectory()&&entry.name.endsWith('.sql')).map(entry=>entry.name).sort();
-  expect(names).toContain('20260920000003_player_ready_state.sql');expect(names).toContain('20260921000001_gameplay_mutation.sql');expect(names).toContain('20260922000000_realtime_game_sync.sql');expect(names).toContain('20260922000001_realtime_lobby_sync.sql');expect(names).toHaveLength(12);
+  expect(names).toContain('20260920000003_player_ready_state.sql');expect(names).toContain('20260921000001_gameplay_mutation.sql');expect(names).toContain('20260922000000_realtime_game_sync.sql');expect(names).toContain('20260922000001_realtime_lobby_sync.sql');expect(names.at(-1)).toBe('20260922000002_multiplayer_ai_players.sql');expect(names).toHaveLength(13);
  });
 
  it('uses invoker security, empty search path, and service-role-only execution',()=>{
@@ -94,7 +94,7 @@ describe('Ready Edge Function and lobby UI',()=>{
  });
 
  it('renders readable Ready status for every player',()=>{
-  const rows=renderLobbyPlayerRows([{userId:'a',displayName:'Alice',playerColor:'red',turnOrder:null,isReady:true,isHost:true,isCurrentUser:true},{userId:'b',displayName:'Bob',playerColor:'blue',turnOrder:null,isReady:false,isHost:false,isCurrentUser:false}]);
+  const rows=renderLobbyPlayerRows([{control:'human',participantId:'a',userId:'a',displayName:'Alice',playerColor:'red',turnOrder:null,isReady:true,isHost:true,isCurrentUser:true},{control:'human',participantId:'b',userId:'b',displayName:'Bob',playerColor:'blue',turnOrder:null,isReady:false,isHost:false,isCurrentUser:false}]);
   expect(rows).toContain('>READY</span>');expect(rows).toContain('>NOT READY</span>');expect(rows.match(/data-player-color-select/g)).toHaveLength(1);
  });
 

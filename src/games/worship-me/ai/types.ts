@@ -1,4 +1,4 @@
-import type {AIDecisionDiagnostics,AIResolutionDiagnostics,BotStrategy,GameAction,GameState,ResolutionDecision} from '../engine/types';
+import type {AIDecisionDiagnostics,AIResolutionDiagnostics,BotStrategy,GameAction,GameState,ResolutionDecision} from '../engine/types.ts';
 
 export interface BotChoice{action:GameAction;rngState:number;score?:number;diagnostics:AIDecisionDiagnostics}
 export interface ResolutionChoice{decision:ResolutionDecision;rngState:number;diagnostics?:AIResolutionDiagnostics}

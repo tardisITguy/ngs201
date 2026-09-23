@@ -1,8 +1,8 @@
-import {next} from '../engine/rng';
-import type {AIResolutionCandidateDiagnostic,BotStrategy,GameAction,GameState,ResolutionDecision,ScoreComponents} from '../engine/types';
-import {scoreActionDetailed,scoreResolutionOption,scoreSmiteResourceChoice,weights,type StrategyWeights} from './scoring';
-import {buildDiagnostics} from './diagnostics';
-import type {BotChoice,BotPolicy,ResolutionChoice} from './types';
+import {next} from '../engine/rng.ts';
+import type {AIResolutionCandidateDiagnostic,BotStrategy,GameAction,GameState,ResolutionDecision,ScoreComponents} from '../engine/types.ts';
+import {scoreActionDetailed,scoreResolutionOption,scoreSmiteResourceChoice,weights,type StrategyWeights} from './scoring.ts';
+import {buildDiagnostics} from './diagnostics.ts';
+import type {BotChoice,BotPolicy,ResolutionChoice} from './types.ts';
 function pick(rngState:number,length:number){let n;[n,rngState]=next(rngState);return{index:Math.floor(n*length),rngState}}
 const zero=():ScoreComponents=>({base:0,templeProgress:0,templePreservation:0,endTriggerValue:0,resourceValue:0,productionValue:0,populationGrowth:0,priestValue:0,disruption:0,exploration:0,mobility:0,resourceRemovalValue:0,productionPreventedValue:0,strategicDisruptionValue:0,populationReleaseValue:0,squareCongestionValue:0,terminalPressure:0,resourceSaturationPenalty:0,stagnationPenalty:0,reversalPenalty:0,riskPenalty:0});
 function resolutionLabel(state:GameState,index:number){const p=state.pendingResolution!;if(p.type==='smiteResource')return`Remove 1 ${p.options[index]}`;const o=p.options[index];return`${o.resourceOnly?'Move':o.neutral?'Influence Neutral':'Move'} ${o.moverRole??''}${o.resource?` + ${o.resource}`:''} ${o.from} → ${o.to}`.replace(/\s+/g,' ').trim()}

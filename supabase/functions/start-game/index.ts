@@ -32,12 +32,19 @@ Deno.serve(async request=>{
  if(roomResult.data.status!=='lobby')return response(409,{error:'This game has already started.'});
  const gameResult=await serverClient.from('games').select('id,slug,status,min_players,max_players').eq('id',roomResult.data.game_id).maybeSingle();
  if(gameResult.error||!gameResult.data||gameResult.data.status!=='active'||gameResult.data.slug!=='worship-me')return response(409,{error:'All players must choose a color and be Ready.'});
- const playerResult=await serverClient.from('room_players').select('user_id,display_name,player_color,is_ready,joined_at,turn_order').eq('room_id',roomResult.data.id).order('joined_at').order('user_id');
- if(playerResult.error||!Array.isArray(playerResult.data))return response(500,{error:'Unable to start game'});
+ const [playerResult,aiResult]=await Promise.all([
+  serverClient.from('room_players').select('user_id,display_name,player_color,is_ready,joined_at,turn_order').eq('room_id',roomResult.data.id).order('joined_at').order('user_id'),
+  serverClient.from('room_ai_players').select('id,bot_number,player_color,bot_strategy,turn_order').eq('room_id',roomResult.data.id).order('bot_number'),
+ ]);
+ if(playerResult.error||aiResult.error||!Array.isArray(playerResult.data)||!Array.isArray(aiResult.data))return response(500,{error:'Unable to start game'});
  const players:TrustedStartPlayer[]=[];
  for(const value of playerResult.data){
   if(typeof value.user_id!=='string'||typeof value.display_name!=='string'||typeof value.player_color!=='string'||value.is_ready!==true||value.turn_order!==null)return response(409,{error:'All players must choose a color and be Ready.'});
-  players.push({userId:value.user_id,displayName:value.display_name,playerColor:value.player_color});
+  players.push({control:'human',userId:value.user_id,displayName:value.display_name,playerColor:value.player_color});
+ }
+ for(const value of aiResult.data){
+  if(typeof value.id!=='string'||!Number.isInteger(value.bot_number)||typeof value.player_color!=='string'||!['random','growth','templeRush','balanced'].includes(value.bot_strategy)||value.turn_order!==null)return response(409,{error:'All players must choose a color and be Ready.'});
+  players.push({control:'ai',aiPlayerId:value.id,displayName:`AI ${value.bot_number}`,playerColor:value.player_color,botStrategy:value.bot_strategy as 'random'|'growth'|'templeRush'|'balanced'});
  }
  if(players.length<gameResult.data.min_players||players.length>gameResult.data.max_players)return response(409,{error:'All players must choose a color and be Ready.'});
  const seed=crypto.randomUUID();

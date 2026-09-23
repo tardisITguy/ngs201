@@ -47,7 +47,7 @@ describe('Set Player Color browser client',()=>{
 });
 
 describe('player color migration and RPC',()=>{
- it('retains the player-color migration in history',()=>{const names=readdirSync(new URL('../supabase/migrations/',import.meta.url),{withFileTypes:true}).filter(entry=>!entry.isDirectory()&&entry.name.endsWith('.sql')).map(entry=>entry.name).sort();expect(names).toContain('20260920000002_player_color_selection.sql');expect(names).toContain('20260921000001_gameplay_mutation.sql');expect(names).toContain('20260922000000_realtime_game_sync.sql');expect(names).toContain('20260922000001_realtime_lobby_sync.sql');expect(names).toHaveLength(12);});
+ it('retains the player-color migration in history',()=>{const names=readdirSync(new URL('../supabase/migrations/',import.meta.url),{withFileTypes:true}).filter(entry=>!entry.isDirectory()&&entry.name.endsWith('.sql')).map(entry=>entry.name).sort();expect(names).toContain('20260920000002_player_color_selection.sql');expect(names).toContain('20260921000001_gameplay_mutation.sql');expect(names).toContain('20260922000000_realtime_game_sync.sql');expect(names).toContain('20260922000001_realtime_lobby_sync.sql');expect(names.at(-1)).toBe('20260922000002_multiplayer_ai_players.sql');expect(names).toHaveLength(13);});
 
  it('creates server-only normalized game color metadata seeded with exact colors',()=>{
   expect(migration).toContain('create table public.game_player_colors');
@@ -110,9 +110,9 @@ describe('Set Player Color Edge Function and lobby UI',()=>{
 
  it('places the only interactive selector on the current player row',()=>{
   const rows=renderLobbyPlayerRows([
-   {userId:'alice',displayName:'Alice',playerColor:'red',turnOrder:null,isReady:false,isHost:true,isCurrentUser:true},
-   {userId:'bob',displayName:'Bob',playerColor:'blue',turnOrder:null,isReady:false,isHost:false,isCurrentUser:false},
-   {userId:'carol',displayName:'Carol',playerColor:null,turnOrder:null,isReady:false,isHost:false,isCurrentUser:false},
+   {control:'human',participantId:'alice',userId:'alice',displayName:'Alice',playerColor:'red',turnOrder:null,isReady:false,isHost:true,isCurrentUser:true},
+   {control:'human',participantId:'bob',userId:'bob',displayName:'Bob',playerColor:'blue',turnOrder:null,isReady:false,isHost:false,isCurrentUser:false},
+   {control:'human',participantId:'carol',userId:'carol',displayName:'Carol',playerColor:null,turnOrder:null,isReady:false,isHost:false,isCurrentUser:false},
   ]);
   expect(rows.match(/data-player-color-select/g)).toHaveLength(1);
   expect(rows).toMatch(/data-player-row="alice" data-current-player[\s\S]*?<select data-player-color-select/);

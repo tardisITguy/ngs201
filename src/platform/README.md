@@ -289,5 +289,36 @@ lobby channels. Automatic refresh covers joins, leaves, display-name changes,
 colors, Ready, host transfer, abandonment, and activation. When the active
 game is established, lobby sync is removed and the game channel alone owns
 the active-game status. Manual **Refresh** remains available as a failure
-fallback. Milestone 11 will add server-authoritative AI players using these
-same database-triggered lobby signals.
+fallback.
+
+## Multiplayer AI players
+
+Humans remain authenticated `room_players`. AI participants live in the
+separate `room_ai_players` table and have no authentication identity, session,
+JWT, or fake human membership. Only the human host may add or remove an AI or
+change its server-validated color and strategy through `manage-ai-player`.
+
+Adding an AI while holding the room lock assigns the smallest unused bot
+number, the first available supported color, and the default Balanced
+strategy. Human Join uses the same room lock and capacity is enforced across
+humans plus AIs. Host succession remains human-only; the final human leaving
+abandons the lobby regardless of its AI configuration.
+
+`getLobby()` returns authenticated humans in stable join order followed by AI
+participants in `bot_number` order. Meaningful AI additions, removals, color
+changes, and strategy changes bump the existing M10 lobby version, so clients
+refetch trusted lobby data; `room_ai_players` itself is not published through
+Realtime.
+
+At Start, humans are ordered by `joined_at`, then `user_id`, followed by AIs
+ordered by `bot_number`. The shared engine creates AI players with canonical
+`control: 'ai'` and `botStrategy`, while database `turn_order` matches engine
+`pN` identity.
+
+For active play, browsers may schedule `advance-ai` with `roomCode` only. The
+trusted server reads canonical state, uses the existing deterministic AI
+policy and canonical RNG, applies one engine decision, and commits it using
+state-version compare-and-swap. A request may continue across consecutive AI
+players, but every decision is a separate versioned commit. M9 synchronizes
+the resulting safe public view. Browsers never select AI moves, and this path
+uses neither polling nor AI-specific Realtime.

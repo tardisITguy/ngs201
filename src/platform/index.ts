@@ -1,4 +1,4 @@
-export type {ActiveGameStateRequest,ActiveGameStateResult,CreateRoomRequest,CreateRoomResult,GameRecord,JoinRoomRequest,JoinRoomResult,LeaveRoomRequest,LeaveRoomResult,RoomGameSyncStatus,RoomGameVersionSignal,RoomLobbySyncStatus,RoomLobbyVersionSignal,RoomPlayerRecord,RoomRecord,RoomStateRecord,SetPlayerColorRequest,SetPlayerColorResult,SetPlayerReadyRequest,SetPlayerReadyResult,StartGameRequest,StartGameResult,SubmitGameActionRequest,SubmitGameActionResult} from './types';
+export type {ActiveGameStateRequest,ActiveGameStateResult,AdvanceAIRequest,AdvanceAIResult,CreateRoomRequest,CreateRoomResult,GameRecord,JoinRoomRequest,JoinRoomResult,LeaveRoomRequest,LeaveRoomResult,ManageAIPlayerCommand,ManageAIPlayerRequest,ManageAIPlayerResult,RoomAIPlayerRecord,RoomGameSyncStatus,RoomGameVersionSignal,RoomLobbySyncStatus,RoomLobbyVersionSignal,RoomPlayerRecord,RoomRecord,RoomStateRecord,SetPlayerColorRequest,SetPlayerColorResult,SetPlayerReadyRequest,SetPlayerReadyResult,StartGameRequest,StartGameResult,SubmitGameActionRequest,SubmitGameActionResult} from './types';
 export type {WorshipMeBrowserCommand} from '../games/worship-me/trustedGameCommand';
 export {ensureAnonymousSession,PlatformAuthError,type AuthenticatedPlatformSession} from './auth/session';
 export {createRoom,CreateRoomError} from './rooms/createRoom';
@@ -9,10 +9,12 @@ export {createSetPlayerReadyAction,setPlayerReady,SetPlayerReadyError} from './r
 export {createStartGameAction,startGame,StartGameError} from './rooms/startGame';
 export {createGetActiveGameStateAction,getActiveGameState,ActiveGameStateError} from './rooms/getActiveGameState';
 export {createSubmitGameAction,submitGameAction,GameActionError} from './rooms/submitGameAction';
+export {createManageAIPlayerAction,manageAIPlayer,ManageAIPlayerError} from './rooms/manageAIPlayer';
+export {advanceAI,createAdvanceAIAction,AdvanceAIError} from './rooms/advanceAI';
 export {subscribeRoomGameUpdates,type RoomGameUpdateSubscription,type SubscribeRoomGameUpdatesOptions} from './rooms/subscribeRoomGameUpdates';
 export {createRoomGameSyncCoordinator,type RoomGameSyncCallbacks,type RoomGameSyncCoordinator,type RoomGameSyncDependencies} from './rooms/roomGameSync';
 export {subscribeRoomLobbyUpdates,type RoomLobbyUpdateSubscription,type SubscribeRoomLobbyUpdatesOptions} from './rooms/subscribeRoomLobbyUpdates';
 export {createRoomLobbySyncCoordinator,type RoomLobbySyncCallbacks,type RoomLobbySyncCoordinator,type RoomLobbySyncDependencies} from './rooms/roomLobbySync';
 export {getSupabaseClient} from './supabase/client';
 export {listActiveGames,GamesCatalogError,type CatalogGame} from './games/catalog';
-export {getLobby,LobbyReadError,type Lobby,type LobbyPlayer} from './rooms/lobby';
+export {getLobby,LobbyReadError,type AILobbyPlayer,type HumanLobbyPlayer,type Lobby,type LobbyPlayer} from './rooms/lobby';

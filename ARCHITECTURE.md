@@ -376,8 +376,47 @@ version known when it begins and marks only that captured version handled. A
 newer signal received in flight therefore causes one catch-up fetch. A
 connection gap similarly causes one trusted catch-up after recovery. There is
 no polling, and manual **Refresh** remains available if Realtime is down.
-Milestone 11 will add server-authoritative AI lobby participants on top of
-this generic synchronized-lobby foundation.
+Milestone 11 adds server-authoritative AI participants on top of this generic
+synchronized-lobby foundation.
+
+## Multiplayer AI players
+
+Authenticated humans remain `room_players`. AI participants are separate
+`public.room_ai_players` rows with stable server-generated UUIDs, a room-local
+`bot_number`, color, strategy, and eventual `turn_order`. They have no
+`auth.users` record, JWT, or fake human membership.
+
+```text
+host -> manage-ai-player -> service-only AI-player RPC
+     -> room_ai_players -> room_lobby_updates signal -> getLobby()
+```
+
+Only the human host can add or remove AI players or change an AI player's
+server-validated color and strategy. Adding an AI selects the smallest unused
+bot number and first available supported color while holding the room lock.
+Human joins use the same lock and enforce capacity across humans plus AIs.
+Bots never become host, and the lobby is abandoned when its last human leaves.
+
+At Start, humans are ordered by `joined_at`, then `user_id`; AI players follow
+in `bot_number` order. That exact trusted roster is passed to the existing
+Worship Me! `createGame()` and persisted as `turn_order`, so the first human
+maps to `p1` and AI players occupy the remaining engine IDs in stable order.
+
+```text
+browser scheduler -> advance-ai({ roomCode })
+  -> verified human membership -> canonical AI strategy + RNG
+  -> existing AI policy and reducer -> commit_ai_action_server CAS
+  -> room_states version increment -> room_game_updates signal
+  -> allowlisted public GameView
+```
+
+The browser may request host-authorized AI lobby configuration, but it never
+chooses an active AI action, pending-resolution answer, RNG value, or canonical
+state. Each AI decision is committed
+separately against an expected canonical version, so concurrent schedulers
+cannot overwrite one another. Realtime remains notification-only;
+`room_ai_players` and `room_states` are not published. Meaningful AI add,
+remove, color, and strategy changes bump the existing safe lobby signal.
 
 Worship Me! retains its own rules contract, state schema, actions, validation,
 resolution queue, production and victory behavior, save schema, AI strategies,

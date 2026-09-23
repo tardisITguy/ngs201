@@ -1,4 +1,4 @@
-import type {AIDecisionDiagnostics,BotStrategy,GameAction,GameState,PlacementAction,ScoreComponents} from '../engine/types';
+import type {AIDecisionDiagnostics,BotStrategy,GameAction,GameState,PlacementAction,ScoreComponents} from '../engine/types.ts';
 
 export function describeCandidate(state:GameState,action:GameAction){
  if(action.type==='endTurn')return'End placements';
