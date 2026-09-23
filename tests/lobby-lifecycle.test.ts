@@ -78,6 +78,7 @@ describe('Lobby lifecycle migration',()=>{
    '20260922000001_realtime_lobby_sync.sql',
    '20260922000002_multiplayer_ai_players.sql',
    '20260923000000_fix_multiplayer_ai_sql_ambiguity.sql',
+   '20260923000001_fix_start_game_coalesce.sql',
   ]);
  });
 
