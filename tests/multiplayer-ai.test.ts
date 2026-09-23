@@ -11,6 +11,7 @@ import {renderLobbyPlayerRows} from '../src/platform/rooms/lobbyPlayerRows';
 import type {LobbyPlayer} from '../src/platform/rooms/lobby';
 
 const migration=readFileSync(new URL('../supabase/migrations/20260922000002_multiplayer_ai_players.sql',import.meta.url),'utf8');
+const repairMigration=readFileSync(new URL('../supabase/migrations/20260923000000_fix_multiplayer_ai_sql_ambiguity.sql',import.meta.url),'utf8');
 const manageEdge=readFileSync(new URL('../supabase/functions/manage-ai-player/index.ts',import.meta.url),'utf8');
 const advanceEdge=readFileSync(new URL('../supabase/functions/advance-ai/index.ts',import.meta.url),'utf8');
 const startEdge=readFileSync(new URL('../supabase/functions/start-game/index.ts',import.meta.url),'utf8');
@@ -20,9 +21,11 @@ const rows=readFileSync(new URL('../src/platform/rooms/lobbyPlayerRows.ts',impor
 const config=readFileSync(new URL('../supabase/config.toml',import.meta.url),'utf8');
 const migrations=()=>readdirSync(new URL('../supabase/migrations/',import.meta.url),{withFileTypes:true}).filter(entry=>!entry.isDirectory()&&entry.name.endsWith('.sql')).map(entry=>entry.name).sort();
 const body=(name:string)=>{const start=migration.indexOf(`function public.${name}`),end=migration.indexOf('end;$$;',start);return migration.slice(start,end);};
+const repairBody=(name:string)=>{const start=repairMigration.indexOf(`function public.${name}`),end=repairMigration.indexOf('end;$$;',start);return repairMigration.slice(start,end);};
+const contentFingerprint=(value:string)=>{let hash=2166136261;for(let index=0;index<value.length;index++)hash=Math.imul(hash^value.charCodeAt(index),16777619);return(hash>>>0).toString(16).padStart(8,'0');};
 
 describe('M11 additive AI schema and authority',()=>{
- it('keeps exactly one thirteenth M11 migration',()=>{expect(migrations()).toHaveLength(13);expect(migrations().at(-1)).toBe('20260922000002_multiplayer_ai_players.sql');});
+ it('keeps the applied M11 migration unchanged and adds one fourteenth repair migration',()=>{expect(migrations()).toHaveLength(14);expect(migrations().at(-2)).toBe('20260922000002_multiplayer_ai_players.sql');expect(migrations().at(-1)).toBe('20260923000000_fix_multiplayer_ai_sql_ambiguity.sql');expect(contentFingerprint(migration.replace(/\r\n/g,'\n'))).toBe('0dc12235');});
  it('creates room_ai_players with no user or Auth identity',()=>{const table=migration.slice(migration.indexOf('create table public.room_ai_players'),migration.indexOf('create unique index room_ai_players_room_color_uidx'));for(const field of ['id uuid primary key default gen_random_uuid()','room_id uuid not null references public.rooms(id) on delete cascade','bot_number smallint not null','player_color text not null',"bot_strategy text not null default 'balanced'",'turn_order smallint','created_at timestamptz not null default now()','updated_at timestamptz not null default now()'])expect(table).toContain(field);expect(table).not.toMatch(/\buser_id\b|auth\.users|seat_number|slot_type/);});
  it('constrains bot number, strategy, color, and optional turn order',()=>{expect(migration).toContain('bot_number between 1 and 8');expect(migration).toContain("bot_strategy in ('random','growth','templeRush','balanced')");expect(migration).toContain('unique (room_id, bot_number)');expect(migration).toContain('room_ai_players_room_color_uidx on public.room_ai_players(room_id, player_color) where player_color is not null');expect(migration).toContain('room_ai_players_room_turn_order_uidx');expect(migration).toContain('where turn_order is not null');});
  it('allows authenticated member reads but service-role-only mutation',()=>{expect(migration).toContain('alter table public.room_ai_players enable row level security');expect(migration).toContain('grant select on table public.room_ai_players to authenticated');expect(migration).toContain('using (ngsllc_private.is_room_member(room_id))');expect(migration).toContain('grant select, insert, update, delete on table public.room_ai_players to service_role');expect(migration).not.toMatch(/grant\s+(?:insert|update|delete|all).*room_ai_players to authenticated/i);});
@@ -43,8 +46,40 @@ describe('M10 signal and SQL structure',()=>{
  it('keeps publication exactly on the two safe signal tables',()=>{const all=migrations().map(name=>readFileSync(new URL(`../supabase/migrations/${name}`,import.meta.url),'utf8')).join('\n');expect(all.match(/alter publication supabase_realtime add table/g)).toHaveLength(2);expect(all).toContain('add table public.room_game_updates');expect(all).toContain('add table public.room_lobby_updates');expect(all).not.toMatch(/add table public\.(?:rooms|room_players|room_ai_players|room_states)/);});
 });
 
+describe('M11 forward-only PL/pgSQL ambiguity repair',()=>{
+ it('replaces only the seven affected functions without schema or architecture changes',()=>{
+  const functionNames=['add_room_ai_player_server','start_game_server','remove_room_ai_player_server','set_room_ai_player_color_server','set_room_ai_player_strategy_server','join_room_server','set_player_color_server'];
+  for(const name of functionNames){const fn=repairBody(name);expect(repairMigration).toContain(`create or replace function public.${name}`);expect(fn).toContain("language plpgsql security invoker set search_path='' as $$");}
+  expect(repairMigration.match(/create or replace function public\./g)).toHaveLength(7);
+  expect(repairMigration).not.toMatch(/\b(?:create|alter|drop)\s+(?:table|index|policy|trigger|publication)\b/i);
+ });
+ it('qualifies table columns that collide with variables or RETURNS TABLE outputs',()=>{
+  const functionNames=['add_room_ai_player_server','start_game_server','remove_room_ai_player_server','set_room_ai_player_color_server','set_room_ai_player_strategy_server','join_room_server','set_player_color_server'];
+  const collidingNames='room_id|room_code|game_id|status|player_color|bot_strategy|turn_order|state_version|viewer_turn_order|ai_player_id|user_id|id|color';
+  const barePredicate=new RegExp(`\\b(?:where|and|or)\\s+(?:${collidingNames})\\b`,'i');
+  for(const name of functionNames)expect(repairBody(name),name).not.toMatch(barePredicate);
+
+  const join=repairBody('join_room_server');
+  expect(join).toContain('from public.room_players rp where rp.room_id=v_room_id');
+  expect(join).toContain('from public.room_ai_players ai where ai.room_id=v_room_id');
+  expect(join).toContain('where rp.room_id=v_room_id and rp.user_id=p_user_id');
+
+  const color=repairBody('set_player_color_server');
+  expect(color).toContain('where supported.game_id=v_game_id and supported.color=v_requested_color');
+  expect(color).toContain('where other_player.room_id=v_room_id and other_player.user_id<>p_user_id');
+  expect(color).toContain('where ai.room_id=v_room_id and ai.player_color=v_requested_color');
+
+  const start=repairBody('start_game_server');
+  expect(start).toContain('where rp.room_id=v_room_id');
+  expect(start).toContain('where ai.room_id=v_room_id');
+  expect(start).toContain('where rs.room_id=v_room_id and rs.game_state is null and rs.state_version=0');
+  expect(start).toContain("where r.id=v_room_id and r.status='lobby'");
+ });
+ it('reasserts service-role-only execution for every replacement signature',()=>{for(const signature of ['add_room_ai_player_server(text,uuid)','start_game_server(text,uuid,jsonb,jsonb)','remove_room_ai_player_server(text,uuid,uuid)','set_room_ai_player_color_server(text,uuid,uuid,text)','set_room_ai_player_strategy_server(text,uuid,uuid,text)','join_room_server(text,uuid,text)','set_player_color_server(text,uuid,text)']){expect(repairMigration).toContain(`revoke execute on function public.${signature} from public, anon, authenticated, service_role;`);expect(repairMigration).toContain(`grant execute on function public.${signature} to service_role;`);}});
+});
+
 describe('human-first mixed Start ordering',()=>{
- it('orders humans by joined_at/user_id then AI by bot_number',()=>{const fn=body('start_game_server');expect(fn).toContain('row_number()over(order by rp.joined_at,rp.user_id)');expect(fn).toContain('pg_catalog.jsonb_agg(participant order by participant_group,participant_order)');expect(fn).toContain('select 1,ai.bot_number');expect(fn).toContain('row_number()over(order by bot_number)');expect(fn).not.toContain('seat_number');});
+ it('orders humans by joined_at/user_id then AI by bot_number',()=>{const fn=repairBody('start_game_server');expect(fn).toContain('row_number()over(order by rp.joined_at,rp.user_id)');expect(fn).toContain('pg_catalog.jsonb_agg(participant order by participant_group,participant_order)');expect(fn).toContain('select 1,ai.bot_number');expect(fn).toContain('row_number()over(order by source.bot_number)');expect(fn).not.toContain('seat_number');});
  it('builds p1 Alice, p2 Bob, p3 AI 1, p4 AI 2',()=>{const roster:TrustedStartPlayer[]=[{control:'human',userId:'alice',displayName:'Alice',playerColor:'red'},{control:'human',userId:'bob',displayName:'Bob',playerColor:'blue'},{control:'ai',aiPlayerId:'ai-1',displayName:'AI 1',playerColor:'purple',botStrategy:'growth'},{control:'ai',aiPlayerId:'ai-2',displayName:'AI 2',playerColor:'yellow',botStrategy:'balanced'}];const state=buildWorshipMeInitialState(roster,'mixed');expect(state.players.map(({id,name,control,botStrategy})=>({id,name,control,botStrategy}))).toEqual([{id:'p1',name:'Alice',control:'human',botStrategy:undefined},{id:'p2',name:'Bob',control:'human',botStrategy:undefined},{id:'p3',name:'AI 1',control:'ai',botStrategy:'growth'},{id:'p4',name:'AI 2',control:'ai',botStrategy:'balanced'}]);});
  it('preserves the human-only createGame order',()=>{const state=buildWorshipMeInitialState([{control:'human',userId:'alice',displayName:'Alice',playerColor:'red'},{control:'human',userId:'bob',displayName:'Bob',playerColor:'blue'}],'humans');expect(state.players.map(player=>player.name)).toEqual(['Alice','Bob']);expect(state.turnOrder).toEqual(['p1','p2']);});
  it('persists compressed human then AI turn order in both tables',()=>{const fn=body('start_game_server');expect(fn).toContain('update public.room_players');expect(fn).toContain('update public.room_ai_players');expect(fn).toContain('v_human_count+ordered.position-1');});
