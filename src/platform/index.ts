@@ -1,8 +1,13 @@
-export type {ActiveGameStateRequest,ActiveGameStateResult,AdvanceAIRequest,AdvanceAIResult,CreateRoomRequest,CreateRoomResult,GamePresenceRequest,GamePresenceResult,GameRecord,JoinRoomRequest,JoinRoomResult,LeaveRoomRequest,LeaveRoomResult,ManageAIPlayerCommand,ManageAIPlayerRequest,ManageAIPlayerResult,RoomAIPlayerRecord,RoomGameSyncStatus,RoomGameVersionSignal,RoomLobbySyncStatus,RoomLobbyVersionSignal,RoomPlayerRecord,RoomRecord,RoomStateRecord,SetPlayerColorRequest,SetPlayerColorResult,SetPlayerReadyRequest,SetPlayerReadyResult,StartGameRequest,StartGameResult,SubmitGameActionRequest,SubmitGameActionResult} from './types';
+export type {ActiveGameStateRequest,ActiveGameStateResult,AdvanceAIRequest,AdvanceAIResult,CreateRoomRequest,CreateRoomResult,GamePresenceRequest,GamePresenceResult,GameRecord,JoinableRoom,JoinPublicRoomRequest,JoinPublicRoomResult,JoinRoomRequest,JoinRoomResult,LeaveRoomRequest,LeaveRoomResult,ListJoinableRoomsRequest,ListJoinableRoomsResult,ManageAIPlayerCommand,ManageAIPlayerRequest,ManageAIPlayerResult,ManageLobbyCommand,ManageLobbyRequest,ManageLobbyResult,RoomAIPlayerRecord,RoomGameSyncStatus,RoomGameVersionSignal,RoomKickNotice,RoomLobbySyncStatus,RoomLobbyVersionSignal,RoomPlayerRecord,RoomRecord,RoomStateRecord,SetPlayerColorRequest,SetPlayerColorResult,SetPlayerReadyRequest,SetPlayerReadyResult,StartGameRequest,StartGameResult,SubmitGameActionRequest,SubmitGameActionResult} from './types';
 export type {WorshipMeBrowserCommand} from '../games/worship-me/trustedGameCommand';
 export {ensureAnonymousSession,PlatformAuthError,type AuthenticatedPlatformSession} from './auth/session';
 export {createRoom,CreateRoomError} from './rooms/createRoom';
 export {createJoinAction,joinRoom,JoinRoomError,normalizeRoomCode} from './rooms/joinRoom';
+export {createJoinPublicRoomAction,joinPublicRoom,JoinPublicRoomError} from './rooms/joinPublicRoom';
+export {listJoinableRooms,RoomDirectoryError} from './rooms/listJoinableRooms';
+export {createManageLobbyAction,manageLobby,ManageLobbyError} from './rooms/manageLobby';
+export {subscribeRoomKicks,type RoomKickSubscription,type SubscribeRoomKicksOptions} from './rooms/subscribeRoomKicks';
+export {createRoomKickSyncCoordinator,type RoomKickSyncCoordinator} from './rooms/roomKickSync';
 export {createLeaveAction,leaveRoom,LeaveRoomError} from './rooms/leaveRoom';
 export {createSetPlayerColorAction,setPlayerColor,SetPlayerColorError} from './rooms/setPlayerColor';
 export {createSetPlayerReadyAction,setPlayerReady,SetPlayerReadyError} from './rooms/setPlayerReady';

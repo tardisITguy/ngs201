@@ -19,6 +19,7 @@ export interface RoomRecord {
  code:string;
  host_user_id:string;
  status:'lobby'|'active'|'finished'|'abandoned';
+ join_mode:'public'|'code';
  created_at:string;
  updated_at:string;
 }
@@ -72,6 +73,16 @@ export interface JoinRoomResult {
  };
  joinedNew:boolean;
 }
+
+export interface JoinableRoom{roomCode:string;hostDisplayName:string;humanPlayers:number;aiPlayers:number;totalPlayers:number;maxPlayers:number;createdAt:string}
+export interface ListJoinableRoomsRequest{gameSlug:string}
+export interface ListJoinableRoomsResult{rooms:JoinableRoom[]}
+export type JoinPublicRoomRequest=JoinRoomRequest;
+export type JoinPublicRoomResult=JoinRoomResult;
+export type ManageLobbyCommand={type:'setJoinMode';joinMode:'public'|'code'}|{type:'kickPlayer';targetUserId:string};
+export interface ManageLobbyRequest{roomCode:string;command:ManageLobbyCommand}
+export interface ManageLobbyResult{roomCode:string}
+export interface RoomKickNotice{roomId:string;kickedAt:string}
 
 export interface LeaveRoomRequest {roomCode:string}
 

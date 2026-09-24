@@ -61,6 +61,7 @@ Deno.serve(async request=>{
   if(error.code==='22023')return response(400,{error:'Invalid room request'});
   if(error.code==='P0002')return response(404,{error:'Room not found or unavailable'});
   if(error.code==='P0003')return response(409,{error:'Room is full'});
+  if(error.code==='P0007')return response(403,{error:'You were removed from this room by the host.'});
   return response(500,{error:'Unable to join room'});
  }
  const record=Array.isArray(data)?data[0]:data;

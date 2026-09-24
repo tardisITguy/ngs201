@@ -9,6 +9,8 @@ export class JoinRoomError extends Error {
 
 export function normalizeRoomCode(value:string):string{return value.trim().toUpperCase();}
 
+async function functionErrorMessage(error:unknown):Promise<string|undefined>{const context=typeof error==='object'&&error!==null&&'context'in error?(error as {context?:unknown}).context:undefined;if(!(context instanceof Response))return;try{const body=await context.clone().json() as {error?:unknown};return typeof body.error==='string'?body.error:undefined;}catch{return;}}
+
 function validatedRequest(request:JoinRoomRequest):JoinRoomRequest{
  const roomCode=normalizeRoomCode(request.roomCode);
  const displayName=request.displayName.trim();
@@ -33,7 +35,7 @@ export async function joinRoom(request:JoinRoomRequest,client:SupabaseClient=get
  const body=validatedRequest(request);
  await ensureAnonymousSession(client);
  const {data,error}=await client.functions.invoke('join-room',{body});
- if(error)throw new JoinRoomError('Unable to join room.');
+ if(error)throw new JoinRoomError((await functionErrorMessage(error))??'Unable to join room.');
  if(!isResult(data))throw new JoinRoomError('Join Room returned an invalid response.');
  return data;
 }

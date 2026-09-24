@@ -30,3 +30,12 @@ verify_jwt = true
 
 [functions.game-presence]
 verify_jwt = true
+
+[functions.list-rooms]
+verify_jwt = true
+
+[functions.join-public-room]
+verify_jwt = true
+
+[functions.manage-lobby]
+verify_jwt = true
