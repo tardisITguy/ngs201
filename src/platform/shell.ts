@@ -6,6 +6,7 @@ import {createJoinAction,normalizeRoomCode} from './rooms/joinRoom';
 import {createJoinPublicRoomAction,JoinPublicRoomError} from './rooms/joinPublicRoom';
 import {listJoinableRooms,RoomDirectoryError} from './rooms/listJoinableRooms';
 import {createLeaveAction} from './rooms/leaveRoom';
+import {createReturnToLobbyAction,ReturnToLobbyError} from './rooms/returnToLobby';
 import {createSetPlayerColorAction,SetPlayerColorError} from './rooms/setPlayerColor';
 import {createSetPlayerReadyAction,SetPlayerReadyError} from './rooms/setPlayerReady';
 import {createStartGameAction,StartGameError} from './rooms/startGame';
@@ -21,6 +22,7 @@ import {subscribeRoomGameUpdates} from './rooms/subscribeRoomGameUpdates';
 import {createRoomLobbySyncCoordinator} from './rooms/roomLobbySync';
 import {subscribeRoomLobbyUpdates} from './rooms/subscribeRoomLobbyUpdates';
 import {createRoomKickSyncCoordinator} from './rooms/roomKickSync';
+import {createActiveRoomLobbyLifecycle} from './rooms/activeRoomLobbyLifecycle';
 import {describeBlessEdgeOption} from './rooms/blessEdgeOptionLabel';
 import type {ActiveGameStateResult,RoomGameSyncStatus,RoomLobbySyncStatus} from './types';
 import type {WorshipMeBrowserCommand} from '../games/worship-me/trustedGameCommand';
@@ -45,6 +47,7 @@ export function startPlayShell(root:HTMLDivElement){
  const join=createJoinAction();
  const joinPublic=createJoinPublicRoomAction();
  const leave=createLeaveAction();
+ const returnLobby=createReturnToLobbyAction();
  const setColor=createSetPlayerColorAction();
  const setReady=createSetPlayerReadyAction();
  const start=createStartGameAction();
@@ -57,19 +60,24 @@ export function startPlayShell(root:HTMLDivElement){
  const gamePresence=createActiveGamePresenceCoordinator({}, {touch:request=>touchGamePresence(request)});
  let aiAdvanceInFlight=false,aiAttemptedRoom:string|undefined,aiAttemptedVersion=-1,aiAdvanceError='',aiAdvanceToken=0;
  let gameSyncStatus:RoomGameSyncStatus='unavailable',lobbySyncStatus:RoomLobbySyncStatus='unavailable',lastSyncError:unknown,lastLobbyError:unknown,pendingLobbyNotice='',pendingJoinNotice='';
+ let activeLobbySnapshot:Lobby|undefined,activeLobbyMetadataUpdate:((lobby:Lobby)=>void)|undefined;
  const syncLabel=(status:RoomGameSyncStatus)=>status==='live'?'LIVE SYNC':status==='connecting'?'CONNECTING…':'LIVE SYNC UNAVAILABLE · USE REFRESH';
  const aggregateLobbySyncStatus=():RoomGameSyncStatus=>gameSyncStatus==='unavailable'||lobbySyncStatus==='unavailable'?'unavailable':gameSyncStatus==='connecting'||lobbySyncStatus==='connecting'?'connecting':'live';
  const updateSyncStatus=()=>{const lobbyStatus=aggregateLobbySyncStatus();root.querySelectorAll<HTMLElement>('[data-sync-status="lobby"]').forEach(element=>{element.textContent=syncLabel(lobbyStatus);element.dataset.syncState=lobbyStatus;});root.querySelectorAll<HTMLElement>('[data-sync-status="game"]').forEach(element=>{element.textContent=syncLabel(gameSyncStatus);element.dataset.syncState=gameSyncStatus;});};
  const roomLobbySync=createRoomLobbySyncCoordinator({
-  onLobby:lobby=>renderLobbyState(lobby,pendingLobbyNotice),
+  onLobby:lobby=>handleLobbySnapshot(lobby,pendingLobbyNotice),
   onStatus:status=>{lobbySyncStatus=status;updateSyncStatus();},
   onError:error=>{lastLobbyError=error;const message=root.querySelector<HTMLElement>('.lobby [data-lobby-message]');if(message)message.textContent='Unable to refresh lobby.';},
  },{fetchLobby:code=>getLobby(code),subscribe:options=>subscribeRoomLobbyUpdates(options)});
  const roomSync=createRoomGameSyncCoordinator({
-  onState:result=>{void roomLobbySync.leave();renderActiveGameState(result.roomCode,result);},
+  onState:result=>renderActiveGameState(result.roomCode,result),
   onStatus:status=>{gameSyncStatus=status;updateSyncStatus();},
   onError:error=>{lastSyncError=error;const message=root.querySelector<HTMLElement>('.active-game [data-game-message]');if(message)message.textContent=error instanceof ActiveGameStateError?error.message:'Unable to refresh game.';},
  },{fetchState:request=>getGameState(request),subscribe:options=>subscribeRoomGameUpdates(options)});
+ const activeRoomLifecycle=createActiveRoomLobbyLifecycle({
+  onActiveMetadata:lobby=>{activeLobbySnapshot=lobby;activeLobbyMetadataUpdate?.(lobby);},
+  onReturnedLobby:async lobby=>{gamePresence.leave();aiAdvanceToken++;aiAdvanceInFlight=false;aiAttemptedRoom=undefined;aiAttemptedVersion=-1;aiAdvanceError='';activeLobbyMetadataUpdate=undefined;activeLobbySnapshot=undefined;await roomSync.leave();if(!roomLobbySync.isCurrent(lobby.room.code))return;await roomSync.enter(lobby.room.code);if(!roomSync.isCurrent(lobby.room.code)||!roomLobbySync.isCurrent(lobby.room.code))return;roomSync.markInitialFetchComplete();activeRoomLifecycle.leave();renderLobbyState(lobby,pendingLobbyNotice);},
+ });
  const roomKickSync=createRoomKickSyncCoordinator(()=>{pendingJoinNotice='You were removed from the room by the host.';gamePresence.leave();aiAdvanceToken++;aiAdvanceInFlight=false;void Promise.all([roomKickSync.leave(),roomLobbySync.leave(),roomSync.leave()]).then(()=>router.navigate('/games/worship-me/join'));});
  let identityReturnPath:string|undefined;
  const router=createRouter(window,route=>void render(route));
@@ -78,11 +86,12 @@ export function startPlayShell(root:HTMLDivElement){
  async function render(route:Route){
   if(route.name==='room'){
    gamePresence.leave();
+   activeRoomLifecycle.leave();activeLobbySnapshot=undefined;activeLobbyMetadataUpdate=undefined;
    if(aiAttemptedRoom&&aiAttemptedRoom!==normalizeRoomCode(route.code)){aiAdvanceToken++;aiAdvanceInFlight=false;aiAttemptedRoom=undefined;aiAttemptedVersion=-1;aiAdvanceError='';}
    root.innerHTML=page(`<section class="lobby"><div class="status-panel" role="status"><span class="spinner"></span> Connecting to room…</div></section>`,true);
    await Promise.all([roomSync.enter(route.code),roomLobbySync.enter(route.code)]);if(!roomSync.isCurrent(route.code)||!roomLobbySync.isCurrent(route.code))return;return renderLobby(route.code);
   }
-  gamePresence.leave();aiAdvanceToken++;aiAdvanceInFlight=false;aiAttemptedRoom=undefined;aiAttemptedVersion=-1;aiAdvanceError='';void Promise.all([roomKickSync.leave(),roomSync.leave(),roomLobbySync.leave()]);
+  gamePresence.leave();activeRoomLifecycle.leave();activeLobbySnapshot=undefined;activeLobbyMetadataUpdate=undefined;aiAdvanceToken++;aiAdvanceInFlight=false;aiAttemptedRoom=undefined;aiAttemptedVersion=-1;aiAdvanceError='';void Promise.all([roomKickSync.leave(),roomSync.leave(),roomLobbySync.leave()]);
   if(route.name==='identity')return renderIdentity();
   if(route.name==='games')return renderGames();
   if(route.name==='worship-me')return renderGameLanding();
@@ -139,13 +148,18 @@ export function startPlayShell(root:HTMLDivElement){
   if(lastLobbyError&&!root.querySelector('.active-game')&&!root.querySelector('[data-lobby-message]')){const message=lastLobbyError instanceof Error?lastLobbyError.message:"You don't have access to this room.";root.querySelector('.lobby')!.innerHTML=`<section class="status-panel error"><h1>Room unavailable</h1><p>${escapeHtml(message)}</p><a class="text-link" href="/games" data-link>Back to Games</a></section>`;}
  }
 
+ function handleLobbySnapshot(lobby:Lobby,lobbyNotice=''){
+  if(activeRoomLifecycle.isCurrent(lobby.room.code)){activeRoomLifecycle.accept(lobby);return;}
+  renderLobbyState(lobby,lobbyNotice);
+ }
+
  function renderLobbyState(lobby:Lobby,lobbyNotice=''){
    if(!roomSync.isCurrent(lobby.room.code)||!roomLobbySync.isCurrent(lobby.room.code))return;
-   gamePresence.leave();
-   if(roomSync.latestTrustedVersion>0)return;
    if(lobby.room.status==='active'){
-    void Promise.all([roomKickSync.leave(),roomLobbySync.leave()]);void renderActiveGame(lobby.room.code);return;
+    activeLobbySnapshot=lobby;void roomKickSync.leave();void renderActiveGame(lobby.room.code);return;
    }
+   gamePresence.leave();activeRoomLifecycle.leave();activeLobbySnapshot=undefined;activeLobbyMetadataUpdate=undefined;
+   if(roomSync.latestTrustedVersion>0)return;
    if(lobby.room.status!=='lobby'){void Promise.all([roomKickSync.leave(),roomLobbySync.leave()]);root.querySelector('.lobby')!.innerHTML=`<section class="status-panel"><h1>Room unavailable</h1><p>This room is no longer an active lobby.</p><a class="text-link" href="/games" data-link>Back to Games</a></section>`;return;}
    void roomKickSync.enter(lobby.room.id).catch(()=>{const message=root.querySelector<HTMLElement>('[data-lobby-message]');if(message)message.textContent='Kick notifications are unavailable. Refresh if the room changes.';});
    const humanPlayers=lobby.players.filter(player=>player.control==='human'),aiPlayers=lobby.players.filter(player=>player.control==='ai'),players=renderLobbyPlayerRows(lobby.players,lobby.room.isCurrentUserHost);
@@ -206,11 +220,11 @@ export function startPlayShell(root:HTMLDivElement){
 
  function renderActiveGameState(code:string,result:ActiveGameStateResult){
    if(!roomSync.isCurrent(code)||result.stateVersion<roomSync.latestTrustedVersion)return;
-   void Promise.all([roomKickSync.leave(),roomLobbySync.leave()]);
+   void roomKickSync.leave();activeRoomLifecycle.enter(code);
    const holder=root.querySelector<HTMLElement>('.lobby');if(!holder)return;
    gamePresence.enter(code);
   type Mode='blessTile'|'smiteTile'|'blessEdge'|'smiteEdge';
-  let mode:Mode|undefined,startCell:string|undefined,endCell:string|undefined,submitting=false,leavingGame=false,notice=aiAdvanceError;
+   let mode:Mode|undefined,startCell:string|undefined,endCell:string|undefined,submitting=false,leavingGame=false,returningToLobby=false,notice=aiAdvanceError;
   const playerName=(id:string)=>result.gameView.players.find(player=>player.id===id)?.name??id;
 
   const scheduleAI=async(force=false)=>{
@@ -232,7 +246,13 @@ export function startPlayShell(root:HTMLDivElement){
    mode=undefined;startCell=undefined;endCell=undefined;paint();
   };
 
-  const paint=()=>{
+   const isCurrentHost=()=>activeLobbySnapshot?.room.code===code&&activeLobbySnapshot.room.isCurrentUserHost;
+   const gameOverControls=()=>`<section class="panel active-game__actions" data-game-over-actions><h2>GAME OVER</h2><p>${result.gameView.winnerId?`${escapeHtml(playerName(result.gameView.winnerId))} wins.`:'The game has ended.'}</p>${isCurrentHost()?`<button class="primary-button" type="button" data-return-to-lobby ${returningToLobby?'disabled':''}>${returningToLobby?'RETURNING TO LOBBY…':'RETURN TO LOBBY'}</button>`:'<p>Waiting for the host to return the room to the lobby.</p>'}</section>`;
+   const bindReturnToLobby=()=>{const control=holder.querySelector<HTMLButtonElement>('[data-return-to-lobby]');if(control)control.onclick=async()=>{if(returningToLobby)return;returningToLobby=true;notice='Returning to lobby…';paint();try{const returned=await returnLobby({roomCode:code});if(returned){await roomLobbySync.refresh();return;}}catch(error){notice=error instanceof ReturnToLobbyError?error.message:'Unable to return to lobby.';}returningToLobby=false;if(roomSync.isCurrent(code))paint();};};
+   const refreshGameOverAuthority=()=>{if(result.gameView.phase!=='gameOver')return;const panel=holder.querySelector<HTMLElement>('[data-game-over-actions]');if(!panel)return;panel.outerHTML=gameOverControls();bindReturnToLobby();};
+   activeLobbyMetadataUpdate=lobby=>{activeLobbySnapshot=lobby;refreshGameOverAuthority();};
+
+   const paint=()=>{
    const view=result.gameView,current=view.players.find(player=>player.id===view.currentPlayerId),viewer=view.players.find(player=>player.id===result.viewerPlayerId),direction=view.direction===1?'Clockwise':'Counterclockwise',pending=view.pendingDecision;
    const canPlace=view.phase==='placement'&&view.currentPlayerId===result.viewerPlayerId&&!pending;
    const canResolve=!!pending&&pending.playerId===result.viewerPlayerId;
@@ -243,10 +263,11 @@ export function startPlayShell(root:HTMLDivElement){
     else if(canResolve&&pending.type==='smiteResource')controls=`<section class="panel active-game__actions"><h2>CHOOSE RESOURCE TO SMITE</h2><div class="active-game__action-buttons">${pending.options.map(resource=>`<button type="button" class="primary-button" data-smite-resource="${resource}" ${submitting?'disabled':''}>${resource.toUpperCase()}</button>`).join('')}</div></section>`;
     else controls=`<section class="panel active-game__actions"><p>Waiting for ${escapeHtml(playerName(pending.playerId))} to resolve ${pending.type==='blessEdgeMove'?'Bless Edge':'Smite'}.</p></section>`;}
    else if(view.phase!=='gameOver'){const ai=current?.control==='ai';controls=`<section class="panel active-game__actions"><p>${ai?(aiAdvanceInFlight?'AI THINKING…':aiAdvanceError||`Waiting for ${escapeHtml(playerName(view.currentPlayerId))} · AI.`):`Waiting for ${escapeHtml(playerName(view.currentPlayerId))}.`}</p>${ai&&aiAdvanceError?'<button class="secondary-button" type="button" data-retry-ai>RETRY AI</button>':''}</section>`;}
-   else controls=`<section class="panel active-game__actions"><h2>GAME OVER</h2><p>${view.winnerId?`${escapeHtml(playerName(view.winnerId))} wins.`:'The game has ended.'}</p></section>`;
-   holder.innerHTML=`<section class="active-game"><div class="panel active-game__status"><div class="active-game__status-top"><div><p class="eyebrow">WORSHIP ME!</p><h1>ROOM ${escapeHtml(result.roomCode)}</h1><span class="active-game__version">STATE VERSION ${result.stateVersion}</span><span class="room-sync-status" data-sync-status="game" data-sync-state="${gameSyncStatus}">${syncLabel(gameSyncStatus)}</span></div><div class="active-game__status-actions"><button class="secondary-button compact" type="button" data-leave-game ${submitting||aiAdvanceInFlight||leavingGame?'disabled':''}>${leavingGame?'LEAVING GAME…':'LEAVE GAME'}</button><button class="primary-button compact" type="button" data-refresh-game ${submitting||aiAdvanceInFlight||leavingGame?'disabled':''}>REFRESH GAME</button></div></div><div class="active-game__turns"><p>Round ${view.round} · ${escapeHtml(view.phase)} · ${direction}</p><p>Current Turn: <strong>${escapeHtml(current?.name??view.currentPlayerId)} · ${escapeHtml(current?.color??'Unknown')}${current?.control==='ai'?' · AI':''}</strong></p><p>You: <strong>${escapeHtml(viewer?.name??result.viewerPlayerId)} · ${escapeHtml(viewer?.color??'Unknown')}</strong></p></div><p class="form-message" data-game-message aria-live="polite">${escapeHtml(notice)}</p></div>${controls}<div class="active-game__board-scroll"><div class="multiplayer-board">${renderBoard(view,{start:startCell,end:endCell},{interactive:canPlace})}</div></div><section class="panel active-game__players"><h2>PLAYERS</h2><ol>${players}</ol></section><p class="active-game__readonly">TRUSTED MULTIPLAYER · REALTIME VERSION SIGNALS</p></section>`;
-   const refresh=holder.querySelector<HTMLButtonElement>('[data-refresh-game]')!;refresh.onclick=async()=>{if(submitting)return;refresh.disabled=true;refresh.textContent='REFRESHING…';lastSyncError=undefined;await roomSync.refresh();if(document.body.contains(refresh)){refresh.disabled=false;refresh.textContent='REFRESH GAME';}};
-   const leaveGame=holder.querySelector<HTMLButtonElement>('[data-leave-game]')!;leaveGame.onclick=async()=>{if(leavingGame||!window.confirm('Leave this game? AI will take over your player for the rest of the game.'))return;leavingGame=true;notice='Leaving game…';gamePresence.leave();paint();try{const left=await leave({roomCode:code});if(left){aiAdvanceToken++;aiAdvanceInFlight=false;await Promise.all([roomSync.leave(),roomLobbySync.leave()]);router.navigate('/games/worship-me');return;}}catch{notice='We could not leave the game. Please try again.';}leavingGame=false;if(roomSync.isCurrent(code)){gamePresence.enter(code);paint();}};
+   else controls=gameOverControls();
+   holder.innerHTML=`<section class="active-game"><div class="panel active-game__status"><div class="active-game__status-top"><div><p class="eyebrow">WORSHIP ME!</p><h1>ROOM ${escapeHtml(result.roomCode)}</h1><span class="active-game__version">STATE VERSION ${result.stateVersion}</span><span class="room-sync-status" data-sync-status="game" data-sync-state="${gameSyncStatus}">${syncLabel(gameSyncStatus)}</span></div><div class="active-game__status-actions"><button class="secondary-button compact" type="button" data-leave-game ${submitting||aiAdvanceInFlight||leavingGame||returningToLobby?'disabled':''}>${leavingGame?'LEAVING GAME…':'LEAVE GAME'}</button><button class="primary-button compact" type="button" data-refresh-game ${submitting||aiAdvanceInFlight||leavingGame||returningToLobby?'disabled':''}>REFRESH GAME</button></div></div><div class="active-game__turns"><p>Round ${view.round} · ${escapeHtml(view.phase)} · ${direction}</p><p>Current Turn: <strong>${escapeHtml(current?.name??view.currentPlayerId)} · ${escapeHtml(current?.color??'Unknown')}${current?.control==='ai'?' · AI':''}</strong></p><p>You: <strong>${escapeHtml(viewer?.name??result.viewerPlayerId)} · ${escapeHtml(viewer?.color??'Unknown')}</strong></p></div><p class="form-message" data-game-message aria-live="polite">${escapeHtml(notice)}</p></div>${controls}<div class="active-game__board-scroll"><div class="multiplayer-board">${renderBoard(view,{start:startCell,end:endCell},{interactive:canPlace})}</div></div><section class="panel active-game__players"><h2>PLAYERS</h2><ol>${players}</ol></section><p class="active-game__readonly">TRUSTED MULTIPLAYER · REALTIME VERSION SIGNALS</p></section>`;
+   const refresh=holder.querySelector<HTMLButtonElement>('[data-refresh-game]')!;refresh.onclick=async()=>{if(submitting||returningToLobby)return;refresh.disabled=true;refresh.textContent='REFRESHING…';lastSyncError=undefined;await roomSync.refresh();if(document.body.contains(refresh)){refresh.disabled=false;refresh.textContent='REFRESH GAME';}};
+   const leaveGame=holder.querySelector<HTMLButtonElement>('[data-leave-game]')!;leaveGame.onclick=async()=>{if(leavingGame||returningToLobby||!window.confirm('Leave this game? AI will take over your player for the rest of the game.'))return;leavingGame=true;notice='Leaving game…';gamePresence.leave();paint();try{const left=await leave({roomCode:code});if(left){activeRoomLifecycle.leave();activeLobbySnapshot=undefined;activeLobbyMetadataUpdate=undefined;aiAdvanceToken++;aiAdvanceInFlight=false;await Promise.all([roomSync.leave(),roomLobbySync.leave()]);router.navigate('/games/worship-me');return;}}catch{notice='We could not leave the game. Please try again.';}leavingGame=false;if(roomSync.isCurrent(code)){gamePresence.enter(code);paint();}};
+   bindReturnToLobby();
    holder.querySelectorAll<HTMLButtonElement>('[data-game-mode]').forEach(button=>button.onclick=()=>{mode=button.dataset.gameMode as Mode;startCell=undefined;endCell=undefined;notice='';paint();});
    holder.querySelectorAll<HTMLButtonElement>('[data-cell]').forEach(cell=>cell.onclick=()=>{if(!canPlace||submitting)return;if(!mode){notice='Choose an action first.';paint();return;}const id=cell.dataset.cell!;if(mode==='blessTile'||mode==='smiteTile'){void send({type:'placeTile',kind:mode==='blessTile'?'bless':'smite',cellId:id});return;}if(!startCell){startCell=id;notice='';paint();return;}if(!endCell&&id!==startCell){endCell=id;notice='Confirm the selected edge.';paint();}});
    const end=holder.querySelector<HTMLButtonElement>('[data-end-turn]');if(end)end.onclick=()=>void send({type:'endTurn'});

@@ -121,3 +121,5 @@ export interface AdvanceAIRequest{roomCode:string}
 export type AdvanceAIResult=ActiveGameStateResult;
 export interface GamePresenceRequest{roomCode:string}
 export interface GamePresenceResult{completed:true}
+export interface ReturnToLobbyRequest{roomCode:string}
+export interface ReturnToLobbyResult{roomCode:string;status:'lobby';lobbyVersion:number}

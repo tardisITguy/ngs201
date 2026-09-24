@@ -81,6 +81,7 @@ describe('Lobby lifecycle migration',()=>{
    '20260923000001_fix_start_game_coalesce.sql',
    '20260923000002_active_player_ai_takeover.sql',
    '20260924000000_lobby_discovery_and_host_moderation.sql',
+   '20260924000001_return_finished_game_to_lobby.sql',
   ]);
  });
 

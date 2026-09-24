@@ -39,3 +39,6 @@ verify_jwt = true
 
 [functions.manage-lobby]
 verify_jwt = true
+
+[functions.return-to-lobby]
+verify_jwt = true
