@@ -27,3 +27,6 @@ verify_jwt = true
 
 [functions.advance-ai]
 verify_jwt = true
+
+[functions.game-presence]
+verify_jwt = true

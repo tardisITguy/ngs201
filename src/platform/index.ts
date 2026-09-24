@@ -1,4 +1,4 @@
-export type {ActiveGameStateRequest,ActiveGameStateResult,AdvanceAIRequest,AdvanceAIResult,CreateRoomRequest,CreateRoomResult,GameRecord,JoinRoomRequest,JoinRoomResult,LeaveRoomRequest,LeaveRoomResult,ManageAIPlayerCommand,ManageAIPlayerRequest,ManageAIPlayerResult,RoomAIPlayerRecord,RoomGameSyncStatus,RoomGameVersionSignal,RoomLobbySyncStatus,RoomLobbyVersionSignal,RoomPlayerRecord,RoomRecord,RoomStateRecord,SetPlayerColorRequest,SetPlayerColorResult,SetPlayerReadyRequest,SetPlayerReadyResult,StartGameRequest,StartGameResult,SubmitGameActionRequest,SubmitGameActionResult} from './types';
+export type {ActiveGameStateRequest,ActiveGameStateResult,AdvanceAIRequest,AdvanceAIResult,CreateRoomRequest,CreateRoomResult,GamePresenceRequest,GamePresenceResult,GameRecord,JoinRoomRequest,JoinRoomResult,LeaveRoomRequest,LeaveRoomResult,ManageAIPlayerCommand,ManageAIPlayerRequest,ManageAIPlayerResult,RoomAIPlayerRecord,RoomGameSyncStatus,RoomGameVersionSignal,RoomLobbySyncStatus,RoomLobbyVersionSignal,RoomPlayerRecord,RoomRecord,RoomStateRecord,SetPlayerColorRequest,SetPlayerColorResult,SetPlayerReadyRequest,SetPlayerReadyResult,StartGameRequest,StartGameResult,SubmitGameActionRequest,SubmitGameActionResult} from './types';
 export type {WorshipMeBrowserCommand} from '../games/worship-me/trustedGameCommand';
 export {ensureAnonymousSession,PlatformAuthError,type AuthenticatedPlatformSession} from './auth/session';
 export {createRoom,CreateRoomError} from './rooms/createRoom';
@@ -11,6 +11,8 @@ export {createGetActiveGameStateAction,getActiveGameState,ActiveGameStateError} 
 export {createSubmitGameAction,submitGameAction,GameActionError} from './rooms/submitGameAction';
 export {createManageAIPlayerAction,manageAIPlayer,ManageAIPlayerError} from './rooms/manageAIPlayer';
 export {advanceAI,createAdvanceAIAction,AdvanceAIError} from './rooms/advanceAI';
+export {createTouchActiveGamePresenceAction,touchActiveGamePresence,GamePresenceError} from './rooms/gamePresence';
+export {ACTIVE_GAME_PRESENCE_INTERVAL_MS,createActiveGamePresenceCoordinator,type ActiveGamePresenceCallbacks,type ActiveGamePresenceCoordinator,type ActiveGamePresenceDependencies,type ActiveGamePresenceEnvironment} from './rooms/activeGamePresence';
 export {subscribeRoomGameUpdates,type RoomGameUpdateSubscription,type SubscribeRoomGameUpdatesOptions} from './rooms/subscribeRoomGameUpdates';
 export {createRoomGameSyncCoordinator,type RoomGameSyncCallbacks,type RoomGameSyncCoordinator,type RoomGameSyncDependencies} from './rooms/roomGameSync';
 export {subscribeRoomLobbyUpdates,type RoomLobbyUpdateSubscription,type SubscribeRoomLobbyUpdatesOptions} from './rooms/subscribeRoomLobbyUpdates';

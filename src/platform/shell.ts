@@ -11,6 +11,8 @@ import {createGetActiveGameStateAction,ActiveGameStateError} from './rooms/getAc
 import {createSubmitGameAction,GameActionError} from './rooms/submitGameAction';
 import {createManageAIPlayerAction,ManageAIPlayerError} from './rooms/manageAIPlayer';
 import {createAdvanceAIAction,AdvanceAIError} from './rooms/advanceAI';
+import {createTouchActiveGamePresenceAction} from './rooms/gamePresence';
+import {createActiveGamePresenceCoordinator} from './rooms/activeGamePresence';
 import {createRoomGameSyncCoordinator} from './rooms/roomGameSync';
 import {subscribeRoomGameUpdates} from './rooms/subscribeRoomGameUpdates';
 import {createRoomLobbySyncCoordinator} from './rooms/roomLobbySync';
@@ -44,6 +46,8 @@ export function startPlayShell(root:HTMLDivElement){
  const submitGame=createSubmitGameAction();
  const manageAI=createManageAIPlayerAction();
  const advanceAI=createAdvanceAIAction();
+ const touchGamePresence=createTouchActiveGamePresenceAction();
+ const gamePresence=createActiveGamePresenceCoordinator({}, {touch:request=>touchGamePresence(request)});
  let aiAdvanceInFlight=false,aiAttemptedRoom:string|undefined,aiAttemptedVersion=-1,aiAdvanceError='',aiAdvanceToken=0;
  let gameSyncStatus:RoomGameSyncStatus='unavailable',lobbySyncStatus:RoomLobbySyncStatus='unavailable',lastSyncError:unknown,lastLobbyError:unknown,pendingLobbyNotice='';
  const syncLabel=(status:RoomGameSyncStatus)=>status==='live'?'LIVE SYNC':status==='connecting'?'CONNECTING…':'LIVE SYNC UNAVAILABLE · USE REFRESH';
@@ -65,11 +69,12 @@ export function startPlayShell(root:HTMLDivElement){
 
  async function render(route:Route){
   if(route.name==='room'){
+   gamePresence.leave();
    if(aiAttemptedRoom&&aiAttemptedRoom!==normalizeRoomCode(route.code)){aiAdvanceToken++;aiAdvanceInFlight=false;aiAttemptedRoom=undefined;aiAttemptedVersion=-1;aiAdvanceError='';}
    root.innerHTML=page(`<section class="lobby"><div class="status-panel" role="status"><span class="spinner"></span> Connecting to room…</div></section>`,true);
    await Promise.all([roomSync.enter(route.code),roomLobbySync.enter(route.code)]);if(!roomSync.isCurrent(route.code)||!roomLobbySync.isCurrent(route.code))return;return renderLobby(route.code);
   }
-  aiAdvanceToken++;aiAdvanceInFlight=false;aiAttemptedRoom=undefined;aiAttemptedVersion=-1;aiAdvanceError='';void Promise.all([roomSync.leave(),roomLobbySync.leave()]);
+  gamePresence.leave();aiAdvanceToken++;aiAdvanceInFlight=false;aiAttemptedRoom=undefined;aiAttemptedVersion=-1;aiAdvanceError='';void Promise.all([roomSync.leave(),roomLobbySync.leave()]);
   if(route.name==='identity')return renderIdentity();
   if(route.name==='games')return renderGames();
   if(route.name==='worship-me')return renderGameLanding();
@@ -124,6 +129,7 @@ export function startPlayShell(root:HTMLDivElement){
 
  function renderLobbyState(lobby:Lobby,lobbyNotice=''){
    if(!roomSync.isCurrent(lobby.room.code)||!roomLobbySync.isCurrent(lobby.room.code))return;
+   gamePresence.leave();
    if(roomSync.latestTrustedVersion>0)return;
    if(lobby.room.status==='active'){
     void roomLobbySync.leave();void renderActiveGame(lobby.room.code);return;
@@ -183,11 +189,12 @@ export function startPlayShell(root:HTMLDivElement){
  }
 
  function renderActiveGameState(code:string,result:ActiveGameStateResult){
-  if(!roomSync.isCurrent(code)||result.stateVersion<roomSync.latestTrustedVersion)return;
-  void roomLobbySync.leave();
-  const holder=root.querySelector<HTMLElement>('.lobby');if(!holder)return;
+   if(!roomSync.isCurrent(code)||result.stateVersion<roomSync.latestTrustedVersion)return;
+   void roomLobbySync.leave();
+   const holder=root.querySelector<HTMLElement>('.lobby');if(!holder)return;
+   gamePresence.enter(code);
   type Mode='blessTile'|'smiteTile'|'blessEdge'|'smiteEdge';
-  let mode:Mode|undefined,startCell:string|undefined,endCell:string|undefined,submitting=false,notice=aiAdvanceError;
+  let mode:Mode|undefined,startCell:string|undefined,endCell:string|undefined,submitting=false,leavingGame=false,notice=aiAdvanceError;
   const playerName=(id:string)=>result.gameView.players.find(player=>player.id===id)?.name??id;
 
   const scheduleAI=async(force=false)=>{
@@ -221,8 +228,9 @@ export function startPlayShell(root:HTMLDivElement){
     else controls=`<section class="panel active-game__actions"><p>Waiting for ${escapeHtml(playerName(pending.playerId))} to resolve ${pending.type==='blessEdgeMove'?'Bless Edge':'Smite'}.</p></section>`;}
    else if(view.phase!=='gameOver'){const ai=current?.control==='ai';controls=`<section class="panel active-game__actions"><p>${ai?(aiAdvanceInFlight?'AI THINKING…':aiAdvanceError||`Waiting for ${escapeHtml(playerName(view.currentPlayerId))} · AI.`):`Waiting for ${escapeHtml(playerName(view.currentPlayerId))}.`}</p>${ai&&aiAdvanceError?'<button class="secondary-button" type="button" data-retry-ai>RETRY AI</button>':''}</section>`;}
    else controls=`<section class="panel active-game__actions"><h2>GAME OVER</h2><p>${view.winnerId?`${escapeHtml(playerName(view.winnerId))} wins.`:'The game has ended.'}</p></section>`;
-   holder.innerHTML=`<section class="active-game"><div class="panel active-game__status"><div class="active-game__status-top"><div><p class="eyebrow">WORSHIP ME!</p><h1>ROOM ${escapeHtml(result.roomCode)}</h1><span class="active-game__version">STATE VERSION ${result.stateVersion}</span><span class="room-sync-status" data-sync-status="game" data-sync-state="${gameSyncStatus}">${syncLabel(gameSyncStatus)}</span></div><button class="primary-button compact" type="button" data-refresh-game ${submitting||aiAdvanceInFlight?'disabled':''}>REFRESH GAME</button></div><div class="active-game__turns"><p>Round ${view.round} · ${escapeHtml(view.phase)} · ${direction}</p><p>Current Turn: <strong>${escapeHtml(current?.name??view.currentPlayerId)} · ${escapeHtml(current?.color??'Unknown')}${current?.control==='ai'?' · AI':''}</strong></p><p>You: <strong>${escapeHtml(viewer?.name??result.viewerPlayerId)} · ${escapeHtml(viewer?.color??'Unknown')}</strong></p></div><p class="form-message" data-game-message aria-live="polite">${escapeHtml(notice)}</p></div>${controls}<div class="active-game__board-scroll"><div class="multiplayer-board">${renderBoard(view,{start:startCell,end:endCell},{interactive:canPlace})}</div></div><section class="panel active-game__players"><h2>PLAYERS</h2><ol>${players}</ol></section><p class="active-game__readonly">TRUSTED MULTIPLAYER · REALTIME VERSION SIGNALS</p></section>`;
+   holder.innerHTML=`<section class="active-game"><div class="panel active-game__status"><div class="active-game__status-top"><div><p class="eyebrow">WORSHIP ME!</p><h1>ROOM ${escapeHtml(result.roomCode)}</h1><span class="active-game__version">STATE VERSION ${result.stateVersion}</span><span class="room-sync-status" data-sync-status="game" data-sync-state="${gameSyncStatus}">${syncLabel(gameSyncStatus)}</span></div><div class="active-game__status-actions"><button class="secondary-button compact" type="button" data-leave-game ${submitting||aiAdvanceInFlight||leavingGame?'disabled':''}>${leavingGame?'LEAVING GAME…':'LEAVE GAME'}</button><button class="primary-button compact" type="button" data-refresh-game ${submitting||aiAdvanceInFlight||leavingGame?'disabled':''}>REFRESH GAME</button></div></div><div class="active-game__turns"><p>Round ${view.round} · ${escapeHtml(view.phase)} · ${direction}</p><p>Current Turn: <strong>${escapeHtml(current?.name??view.currentPlayerId)} · ${escapeHtml(current?.color??'Unknown')}${current?.control==='ai'?' · AI':''}</strong></p><p>You: <strong>${escapeHtml(viewer?.name??result.viewerPlayerId)} · ${escapeHtml(viewer?.color??'Unknown')}</strong></p></div><p class="form-message" data-game-message aria-live="polite">${escapeHtml(notice)}</p></div>${controls}<div class="active-game__board-scroll"><div class="multiplayer-board">${renderBoard(view,{start:startCell,end:endCell},{interactive:canPlace})}</div></div><section class="panel active-game__players"><h2>PLAYERS</h2><ol>${players}</ol></section><p class="active-game__readonly">TRUSTED MULTIPLAYER · REALTIME VERSION SIGNALS</p></section>`;
    const refresh=holder.querySelector<HTMLButtonElement>('[data-refresh-game]')!;refresh.onclick=async()=>{if(submitting)return;refresh.disabled=true;refresh.textContent='REFRESHING…';lastSyncError=undefined;await roomSync.refresh();if(document.body.contains(refresh)){refresh.disabled=false;refresh.textContent='REFRESH GAME';}};
+   const leaveGame=holder.querySelector<HTMLButtonElement>('[data-leave-game]')!;leaveGame.onclick=async()=>{if(leavingGame||!window.confirm('Leave this game? AI will take over your player for the rest of the game.'))return;leavingGame=true;notice='Leaving game…';gamePresence.leave();paint();try{const left=await leave({roomCode:code});if(left){aiAdvanceToken++;aiAdvanceInFlight=false;await Promise.all([roomSync.leave(),roomLobbySync.leave()]);router.navigate('/games/worship-me');return;}}catch{notice='We could not leave the game. Please try again.';}leavingGame=false;if(roomSync.isCurrent(code)){gamePresence.enter(code);paint();}};
    holder.querySelectorAll<HTMLButtonElement>('[data-game-mode]').forEach(button=>button.onclick=()=>{mode=button.dataset.gameMode as Mode;startCell=undefined;endCell=undefined;notice='';paint();});
    holder.querySelectorAll<HTMLButtonElement>('[data-cell]').forEach(cell=>cell.onclick=()=>{if(!canPlace||submitting)return;if(!mode){notice='Choose an action first.';paint();return;}const id=cell.dataset.cell!;if(mode==='blessTile'||mode==='smiteTile'){void send({type:'placeTile',kind:mode==='blessTile'?'bless':'smite',cellId:id});return;}if(!startCell){startCell=id;notice='';paint();return;}if(!endCell&&id!==startCell){endCell=id;notice='Confirm the selected edge.';paint();}});
    const end=holder.querySelector<HTMLButtonElement>('[data-end-turn]');if(end)end.onclick=()=>void send({type:'endTurn'});

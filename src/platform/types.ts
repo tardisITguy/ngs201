@@ -108,3 +108,5 @@ export interface ManageAIPlayerRequest{roomCode:string;command:ManageAIPlayerCom
 export interface ManageAIPlayerResult{roomCode:string}
 export interface AdvanceAIRequest{roomCode:string}
 export type AdvanceAIResult=ActiveGameStateResult;
+export interface GamePresenceRequest{roomCode:string}
+export interface GamePresenceResult{completed:true}
