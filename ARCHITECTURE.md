@@ -207,10 +207,25 @@ rules apply only to lobbies. Active-game disconnect and reconnect semantics
 remain deferred.
 
 Browser navigation, unload, tab closure, and local storage are never
-authoritative lobby mutations. The explicit lobby button calls Leave Lobby;
-otherwise the next trusted Create or Join cleans up stale membership. Realtime
-is still deferred, so remaining players use **Refresh Players** to observe a
-host transfer.
+authoritative lobby mutations. The explicit lobby button calls Leave Lobby.
+While a lobby is actually visible, a 20-second presence heartbeat sends only
+the room code through the authenticated `lobby-presence` Edge Function. Hidden
+tabs do not refresh presence; becoming visible, focus, and online events touch
+immediately only while visible. The service-only
+`touch_lobby_presence_server` locks the room, captures wall-clock time after
+the lock, monotonically refreshes only the verified caller, and removes other
+humans stale for more than 90 seconds through the existing departure helper. This preserves the
+same deterministic host succession and M10 notifications. The heartbeat is
+presence only; M10 Realtime remains the lobby-state synchronization path.
+
+Public directory discovery additionally requires the current human host's
+`last_seen_at` to be within 90 seconds of server time. Thus a zero-observer
+room may retain stale database membership and `lobby` status, but it becomes
+undiscoverable without cron or destructive cleanup. Explicit join by room code
+does not use host freshness; an admitted member starts presence, which may
+clean stale peers and transfer host authority. Lobby presence stops on Leave,
+Kick, Start, room navigation, and non-lobby states, and restarts when a
+finished game returns to the lobby.
 
 ## Game-specific responsibilities
 

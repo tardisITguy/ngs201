@@ -42,3 +42,6 @@ verify_jwt = true
 
 [functions.return-to-lobby]
 verify_jwt = true
+
+[functions.lobby-presence]
+verify_jwt = true

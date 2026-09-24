@@ -137,10 +137,25 @@ the stable tie-breaker. An empty lobby becomes `abandoned`. Active-game
 membership is intentionally outside this milestone.
 
 Browser Back, tab closure, crashes, unload events, and local storage are not
-authoritative lifecycle operations. Stale membership is cleaned up by the
-next trusted Create or Join; the in-app lobby control explicitly calls Leave.
-Realtime remains deferred, so remaining users may need **Refresh Players** to
-see host transfer.
+authoritative lifecycle operations. The in-app lobby control explicitly calls
+Leave. While a lobby is visible, one coordinator immediately touches trusted
+lobby presence and repeats every 20 seconds, with visible-only
+visibility/focus/online recovery touches and no overlapping calls. Hidden tabs
+do not refresh presence. The browser sends only `roomCode`; the Edge Function
+derives the user from the JWT, and the locked service RPC captures wall-clock
+time after locking, monotonically updates only that member's `last_seen_at`,
+then sweeps other humans stale for more than 90 seconds through the existing
+departure helper. AI rows have no presence and are never swept.
+
+The public room directory requires a fresh current human host. Consequently,
+a zero-observer room may remain `lobby` with stale memberships in storage but
+disappears from discovery after 90 seconds without a cron or destructive
+cleanup. Code-based Join intentionally remains available; a returning member
+refreshes itself before stale peers are considered. Presence writes alone do
+not bump M10, while stale membership removal and host transfer do. Lobby
+presence stops on Leave, Kick, Start, route exit, and non-lobby status; active
+game presence takes over after Start, and lobby presence resumes after Return
+to Lobby. M10 Realtime—not the heartbeat—continues to synchronize lobby state.
 
 ## Trusted player-color selection
 

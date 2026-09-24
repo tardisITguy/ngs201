@@ -17,6 +17,8 @@ import {createManageLobbyAction,ManageLobbyError} from './rooms/manageLobby';
 import {createAdvanceAIAction,AdvanceAIError} from './rooms/advanceAI';
 import {createTouchActiveGamePresenceAction} from './rooms/gamePresence';
 import {createActiveGamePresenceCoordinator} from './rooms/activeGamePresence';
+import {createTouchLobbyPresenceAction} from './rooms/lobbyPresence';
+import {createActiveLobbyPresenceCoordinator} from './rooms/activeLobbyPresence';
 import {createRoomGameSyncCoordinator} from './rooms/roomGameSync';
 import {subscribeRoomGameUpdates} from './rooms/subscribeRoomGameUpdates';
 import {createRoomLobbySyncCoordinator} from './rooms/roomLobbySync';
@@ -58,6 +60,8 @@ export function startPlayShell(root:HTMLDivElement){
  const advanceAI=createAdvanceAIAction();
  const touchGamePresence=createTouchActiveGamePresenceAction();
  const gamePresence=createActiveGamePresenceCoordinator({}, {touch:request=>touchGamePresence(request)});
+ const touchLobbyPresence=createTouchLobbyPresenceAction();
+ const lobbyPresence=createActiveLobbyPresenceCoordinator({}, {touch:request=>touchLobbyPresence(request)});
  let aiAdvanceInFlight=false,aiAttemptedRoom:string|undefined,aiAttemptedVersion=-1,aiAdvanceError='',aiAdvanceToken=0;
  let gameSyncStatus:RoomGameSyncStatus='unavailable',lobbySyncStatus:RoomLobbySyncStatus='unavailable',lastSyncError:unknown,lastLobbyError:unknown,pendingLobbyNotice='',pendingJoinNotice='';
  let activeLobbySnapshot:Lobby|undefined,activeLobbyMetadataUpdate:((lobby:Lobby)=>void)|undefined;
@@ -78,20 +82,21 @@ export function startPlayShell(root:HTMLDivElement){
   onActiveMetadata:lobby=>{activeLobbySnapshot=lobby;activeLobbyMetadataUpdate?.(lobby);},
   onReturnedLobby:async lobby=>{gamePresence.leave();aiAdvanceToken++;aiAdvanceInFlight=false;aiAttemptedRoom=undefined;aiAttemptedVersion=-1;aiAdvanceError='';activeLobbyMetadataUpdate=undefined;activeLobbySnapshot=undefined;await roomSync.leave();if(!roomLobbySync.isCurrent(lobby.room.code))return;await roomSync.enter(lobby.room.code);if(!roomSync.isCurrent(lobby.room.code)||!roomLobbySync.isCurrent(lobby.room.code))return;roomSync.markInitialFetchComplete();activeRoomLifecycle.leave();renderLobbyState(lobby,pendingLobbyNotice);},
  });
- const roomKickSync=createRoomKickSyncCoordinator(()=>{pendingJoinNotice='You were removed from the room by the host.';gamePresence.leave();aiAdvanceToken++;aiAdvanceInFlight=false;void Promise.all([roomKickSync.leave(),roomLobbySync.leave(),roomSync.leave()]).then(()=>router.navigate('/games/worship-me/join'));});
+ const roomKickSync=createRoomKickSyncCoordinator(()=>{pendingJoinNotice='You were removed from the room by the host.';lobbyPresence.leave();gamePresence.leave();aiAdvanceToken++;aiAdvanceInFlight=false;void Promise.all([roomKickSync.leave(),roomLobbySync.leave(),roomSync.leave()]).then(()=>router.navigate('/games/worship-me/join'));});
  let identityReturnPath:string|undefined;
  const router=createRouter(window,route=>void render(route));
  root.addEventListener('click',event=>{const link=(event.target as Element).closest<HTMLAnchorElement>('a[data-link]');if(link){event.preventDefault();router.navigate(new URL(link.href).pathname);}});
 
  async function render(route:Route){
   if(route.name==='room'){
+   lobbyPresence.leave();
    gamePresence.leave();
    activeRoomLifecycle.leave();activeLobbySnapshot=undefined;activeLobbyMetadataUpdate=undefined;
    if(aiAttemptedRoom&&aiAttemptedRoom!==normalizeRoomCode(route.code)){aiAdvanceToken++;aiAdvanceInFlight=false;aiAttemptedRoom=undefined;aiAttemptedVersion=-1;aiAdvanceError='';}
    root.innerHTML=page(`<section class="lobby"><div class="status-panel" role="status"><span class="spinner"></span> Connecting to room…</div></section>`,true);
    await Promise.all([roomSync.enter(route.code),roomLobbySync.enter(route.code)]);if(!roomSync.isCurrent(route.code)||!roomLobbySync.isCurrent(route.code))return;return renderLobby(route.code);
   }
-  gamePresence.leave();activeRoomLifecycle.leave();activeLobbySnapshot=undefined;activeLobbyMetadataUpdate=undefined;aiAdvanceToken++;aiAdvanceInFlight=false;aiAttemptedRoom=undefined;aiAttemptedVersion=-1;aiAdvanceError='';void Promise.all([roomKickSync.leave(),roomSync.leave(),roomLobbySync.leave()]);
+  lobbyPresence.leave();gamePresence.leave();activeRoomLifecycle.leave();activeLobbySnapshot=undefined;activeLobbyMetadataUpdate=undefined;aiAdvanceToken++;aiAdvanceInFlight=false;aiAttemptedRoom=undefined;aiAttemptedVersion=-1;aiAdvanceError='';void Promise.all([roomKickSync.leave(),roomSync.leave(),roomLobbySync.leave()]);
   if(route.name==='identity')return renderIdentity();
   if(route.name==='games')return renderGames();
   if(route.name==='worship-me')return renderGameLanding();
@@ -156,11 +161,12 @@ export function startPlayShell(root:HTMLDivElement){
  function renderLobbyState(lobby:Lobby,lobbyNotice=''){
    if(!roomSync.isCurrent(lobby.room.code)||!roomLobbySync.isCurrent(lobby.room.code))return;
    if(lobby.room.status==='active'){
-    activeLobbySnapshot=lobby;void roomKickSync.leave();void renderActiveGame(lobby.room.code);return;
+    lobbyPresence.leave();activeLobbySnapshot=lobby;void roomKickSync.leave();void renderActiveGame(lobby.room.code);return;
    }
    gamePresence.leave();activeRoomLifecycle.leave();activeLobbySnapshot=undefined;activeLobbyMetadataUpdate=undefined;
    if(roomSync.latestTrustedVersion>0)return;
-   if(lobby.room.status!=='lobby'){void Promise.all([roomKickSync.leave(),roomLobbySync.leave()]);root.querySelector('.lobby')!.innerHTML=`<section class="status-panel"><h1>Room unavailable</h1><p>This room is no longer an active lobby.</p><a class="text-link" href="/games" data-link>Back to Games</a></section>`;return;}
+   if(lobby.room.status!=='lobby'){lobbyPresence.leave();void Promise.all([roomKickSync.leave(),roomLobbySync.leave()]);root.querySelector('.lobby')!.innerHTML=`<section class="status-panel"><h1>Room unavailable</h1><p>This room is no longer an active lobby.</p><a class="text-link" href="/games" data-link>Back to Games</a></section>`;return;}
+   lobbyPresence.enter(lobby.room.code);
    void roomKickSync.enter(lobby.room.id).catch(()=>{const message=root.querySelector<HTMLElement>('[data-lobby-message]');if(message)message.textContent='Kick notifications are unavailable. Refresh if the room changes.';});
    const humanPlayers=lobby.players.filter(player=>player.control==='human'),aiPlayers=lobby.players.filter(player=>player.control==='ai'),players=renderLobbyPlayerRows(lobby.players,lobby.room.isCurrentUserHost);
    const currentPlayer=humanPlayers.find(player=>player.isCurrentUser),canReady=WORSHIP_ME_PLAYER_COLORS.includes(currentPlayer?.playerColor as (typeof WORSHIP_ME_PLAYER_COLORS)[number]),readyLabel=currentPlayer?.isReady?'NOT READY':'READY';
@@ -178,9 +184,10 @@ export function startPlayShell(root:HTMLDivElement){
    const leaveButton=root.querySelector<HTMLButtonElement>('[data-leave]')!,leaveMessage=root.querySelector<HTMLElement>('[data-leave-message]')!;
    leaveButton.onclick=async()=>{
     if(!window.confirm('Leave this lobby?'))return;
+    lobbyPresence.leave();
     leaveButton.disabled=true;leaveButton.textContent='LEAVING LOBBY…';leaveMessage.textContent='Leaving lobby...';
     try{const result=await leave({roomCode:lobby.room.code});if(result){await roomKickSync.leave();router.navigate('/games/worship-me');}}
-    catch{leaveMessage.textContent='We could not leave the lobby. Please try again.';}
+    catch{leaveMessage.textContent='We could not leave the lobby. Please try again.';if(roomLobbySync.isCurrent(lobby.room.code))lobbyPresence.enter(lobby.room.code);}
     finally{if(document.body.contains(leaveButton)){leaveButton.disabled=false;leaveButton.textContent='LEAVE LOBBY';}}
    };
    const lobbyMessage=root.querySelector<HTMLElement>('[data-lobby-message]')!,colorControl=root.querySelector<HTMLSelectElement>('[data-player-color-select]');
@@ -204,9 +211,10 @@ export function startPlayShell(root:HTMLDivElement){
    };
    const startButton=root.querySelector<HTMLButtonElement>('[data-start]');
    if(startButton)startButton.onclick=async()=>{
+    lobbyPresence.leave();
     startButton.disabled=true;startButton.textContent='STARTING GAME…';lobbyMessage.textContent='Starting game...';
     try{const started=await start({roomCode:lobby.room.code});if(started){await roomKickSync.leave();await roomSync.refresh();}}
-    catch(error){pendingLobbyNotice=error instanceof StartGameError?error.message:'Unable to start game.';await roomLobbySync.refresh();}
+    catch(error){pendingLobbyNotice=error instanceof StartGameError?error.message:'Unable to start game.';if(roomLobbySync.isCurrent(lobby.room.code))lobbyPresence.enter(lobby.room.code);await roomLobbySync.refresh();}
    };
  }
 
@@ -220,7 +228,7 @@ export function startPlayShell(root:HTMLDivElement){
 
  function renderActiveGameState(code:string,result:ActiveGameStateResult){
    if(!roomSync.isCurrent(code)||result.stateVersion<roomSync.latestTrustedVersion)return;
-   void roomKickSync.leave();activeRoomLifecycle.enter(code);
+   lobbyPresence.leave();void roomKickSync.leave();activeRoomLifecycle.enter(code);
    const holder=root.querySelector<HTMLElement>('.lobby');if(!holder)return;
    gamePresence.enter(code);
   type Mode='blessTile'|'smiteTile'|'blessEdge'|'smiteEdge';
