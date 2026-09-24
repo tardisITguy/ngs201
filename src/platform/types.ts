@@ -74,12 +74,12 @@ export interface JoinRoomResult {
  joinedNew:boolean;
 }
 
-export interface JoinableRoom{roomCode:string;hostDisplayName:string;humanPlayers:number;aiPlayers:number;totalPlayers:number;maxPlayers:number;createdAt:string}
+export interface JoinableRoom{roomCode:string;roomName:string|null;hostDisplayName:string;humanPlayers:number;aiPlayers:number;totalPlayers:number;maxPlayers:number;createdAt:string}
 export interface ListJoinableRoomsRequest{gameSlug:string}
 export interface ListJoinableRoomsResult{rooms:JoinableRoom[]}
 export type JoinPublicRoomRequest=JoinRoomRequest;
 export type JoinPublicRoomResult=JoinRoomResult;
-export type ManageLobbyCommand={type:'setJoinMode';joinMode:'public'|'code'}|{type:'kickPlayer';targetUserId:string};
+export type ManageLobbyCommand={type:'setJoinMode';joinMode:'public'|'code'}|{type:'setRoomName';roomName:string|null}|{type:'kickPlayer';targetUserId:string};
 export interface ManageLobbyRequest{roomCode:string;command:ManageLobbyCommand}
 export interface ManageLobbyResult{roomCode:string}
 export interface RoomKickNotice{roomId:string;kickedAt:string}

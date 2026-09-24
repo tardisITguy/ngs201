@@ -337,3 +337,23 @@ state-version compare-and-swap. A request may continue across consecutive AI
 players, but every decision is a separate versioned commit. M9 synchronizes
 the resulting safe public view. Browsers never select AI moves, and this path
 uses neither polling nor AI-specific Realtime.
+
+## Optional room naming
+
+Room names are optional, non-unique display metadata. Room codes remain the
+authoritative identifiers and direct-join keys. A current host may set or clear
+a name only while the room is a lobby:
+
+```text
+browser setRoomName command -> manage-lobby Edge Function -> verified JWT
+  -> service-only set_room_name_server -> locked host/lobby validation
+  -> rooms.room_name -> M10 version signal -> trusted getLobby() refresh
+```
+
+The name is shown to room members and in eligible public-directory rows. A
+named code-only room is still excluded from the directory, and a named public
+room is still excluded when its current human host is stale. Naming never
+updates lobby-presence timestamps and does not alter Ready state, colors, AI
+configuration, kick records, or join mode. The metadata remains on the room
+through Start, active play, game over, and Return to Lobby; it is not part of
+canonical Worship Me! game state.

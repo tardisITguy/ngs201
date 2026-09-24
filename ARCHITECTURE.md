@@ -437,3 +437,25 @@ Worship Me! retains its own rules contract, state schema, actions, validation,
 resolution queue, production and victory behavior, save schema, AI strategies,
 art assets, and UI. Future games should add sibling modules rather than extend
 or parameterize a universal Worship Me! reducer.
+
+## Optional room names
+
+`rooms.room_name` is nullable cosmetic platform metadata. The room code remains
+the unique room identifier and the sole direct-join key; names are non-unique,
+are never authorization, and are never copied into canonical Worship Me!
+`GameState`.
+
+Only the current human host may set, change, or clear a room name, and only
+while the room is a lobby. The browser sends the request through the existing
+`manage-lobby` Edge Function; the verified user ID is passed to the
+service-role-only `set_room_name_server` RPC, which locks and revalidates the
+room before changing only `rooms.room_name`. A real change advances the M10
+lobby version so members refetch the trusted lobby view; an exact no-op does
+not write or signal.
+
+Public-directory rows may expose the optional name, but remain subject to the
+existing current-host freshness requirement and every other eligibility rule.
+Code-only rooms remain absent from the directory even when named. Naming does
+not touch `room_players.last_seen_at`, so lobby presence stays independent.
+The name is preserved when the game starts and when a finished game returns to
+the lobby for a rematch.

@@ -84,6 +84,7 @@ describe('Lobby lifecycle migration',()=>{
    '20260924000001_return_finished_game_to_lobby.sql',
    '20260924000002_fix_return_to_lobby_signal_read.sql',
    '20260924000003_lobby_presence_and_stale_directory.sql',
+   '20260924000004_room_naming.sql',
   ]);
  });
 

@@ -31,7 +31,7 @@ describe('host flow',()=>{
 });
 
 describe('lobby read model',()=>{
- it('reads ordered humans plus separate AI participants and marks the human host',async()=>{const tables:string[]=[];const room={select:()=>room,eq:()=>room,maybeSingle:async()=>({data:{id:'r',code:'ABC234',status:'lobby',game_id:'g',host_user_id:'host-1',join_mode:'public',games:{max_players:8}},error:null})};const humans={select:()=>humans,eq:()=>humans,order:()=>humans,then:(resolve:(value:unknown)=>unknown)=>Promise.resolve({data:[{user_id:'host-1',display_name:'Test Host',player_color:null,turn_order:null,is_ready:false,joined_at:'now'}],error:null}).then(resolve)};const bots={select:()=>bots,eq:()=>bots,order:async()=>({data:[{id:'11111111-1111-4111-8111-111111111111',bot_number:1,player_color:'red',turn_order:null,bot_strategy:'balanced'}],error:null})};const client={auth,from:(table:string)=>{tables.push(table);return table==='rooms'?room:table==='room_players'?humans:bots;}} as unknown as SupabaseClient;const result=await getLobby('abc234',client);expect(tables).toEqual(['rooms','room_players','room_ai_players']);expect(tables).not.toContain('room_states');expect(result.room.code).toBe('ABC234');expect(result.room.joinMode).toBe('public');expect(result.players).toHaveLength(2);expect(result.players[0]).toMatchObject({control:'human',displayName:'Test Host',isHost:true});expect(result.players[1]).toMatchObject({control:'ai',displayName:'AI 1'});});
+ it('reads ordered humans plus separate AI participants and marks the human host',async()=>{const tables:string[]=[];const room={select:()=>room,eq:()=>room,maybeSingle:async()=>({data:{id:'r',code:'ABC234',status:'lobby',game_id:'g',host_user_id:'host-1',join_mode:'public',room_name:'The Last Temple',games:{max_players:8}},error:null})};const humans={select:()=>humans,eq:()=>humans,order:()=>humans,then:(resolve:(value:unknown)=>unknown)=>Promise.resolve({data:[{user_id:'host-1',display_name:'Test Host',player_color:null,turn_order:null,is_ready:false,joined_at:'now'}],error:null}).then(resolve)};const bots={select:()=>bots,eq:()=>bots,order:async()=>({data:[{id:'11111111-1111-4111-8111-111111111111',bot_number:1,player_color:'red',turn_order:null,bot_strategy:'balanced'}],error:null})};const client={auth,from:(table:string)=>{tables.push(table);return table==='rooms'?room:table==='room_players'?humans:bots;}} as unknown as SupabaseClient;const result=await getLobby('abc234',client);expect(tables).toEqual(['rooms','room_players','room_ai_players']);expect(tables).not.toContain('room_states');expect(result.room.code).toBe('ABC234');expect(result.room.joinMode).toBe('public');expect(result.room.roomName).toBe('The Last Temple');expect(result.players).toHaveLength(2);expect(result.players[0]).toMatchObject({control:'human',displayName:'Test Host',isHost:true});expect(result.players[1]).toMatchObject({control:'ai',displayName:'AI 1'});});
  it('sanitizes inaccessible rooms',async()=>{const room={select:()=>room,eq:()=>room,maybeSingle:async()=>({data:null,error:Error('postgres detail')})};const client={auth,from:()=>room} as unknown as SupabaseClient;await expect(getLobby('ABC234',client)).rejects.toEqual(new LobbyReadError());});
 });
 
@@ -43,7 +43,7 @@ describe('compact lobby presentation',()=>{
   expect(controls).toContain('lobby-controls__actions');
   expect(controls).toContain('data-copy');
   expect(controls).toContain('data-leave');
-  expect(shellSource).toContain('Name Room');
+  expect(shellSource).toContain('ROOM NAME');
   expect(controls).toContain('data-ready');
   expect(controls).toContain('${startGame}');
   expect(shellSource).toContain('START GAME');
@@ -51,9 +51,10 @@ describe('compact lobby presentation',()=>{
   expect(shellSource.indexOf('data-leave')).toBeGreaterThan(shellSource.indexOf('class="lobby-controls"'));
  });
 
- it('keeps future controls presentation-only and trusted commands unchanged',()=>{
-  expect(shellSource).not.toMatch(/data-name-room/);
-  expect(shellSource).not.toMatch(/nameRoom\(/);
+ it('activates trusted room naming while keeping unrelated trusted commands unchanged',()=>{
+  expect(shellSource).toContain('data-room-name');
+  expect(shellSource).toContain('data-save-room-name');
+  expect(shellSource).toContain("command:{type:'setRoomName',roomName:value}");
   expect(shellSource).toContain("leave({roomCode:lobby.room.code})");
   expect(shellSource).toContain('setColor({roomCode:lobby.room.code,playerColor})');
  });
