@@ -485,3 +485,18 @@ memory. A connection gap schedules one trusted history catch-up; it does not
 poll. Chat stays mounted across lobby, active play, game over, and Return to
 Lobby, and it is removed immediately when the route or membership is left.
 M9 game-state and M10 lobby-version synchronization remain separate from chat.
+
+## Client-side rules help
+
+Worship Me! tutorial and How to Play content lives in the game-specific UI
+module, outside the engine and platform database model. The first active-game
+view for each room opens a concise guided tutorial once per browser session;
+completion or Skip records only a per-room `sessionStorage` marker. The full
+reference remains available from the game landing page, lobby, active play,
+and game over, and can replay the tutorial at any time.
+
+Help state is presentation-only. Trusted game repaints preserve an open help
+overlay, while Realtime, presence, chat, AI advancement, and gameplay continue
+normally underneath it. No tutorial value enters canonical `GameState`, no
+state version changes, and no database, RPC, Edge Function, RLS, or Realtime
+state is used for help persistence.

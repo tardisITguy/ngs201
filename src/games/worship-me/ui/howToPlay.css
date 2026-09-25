@@ -1,0 +1,10 @@
+.worship-help-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:clamp(.75rem,3vw,2rem);background:rgba(8,9,10,.82);backdrop-filter:blur(3px)}
+.worship-help{display:flex;flex-direction:column;width:min(760px,100%);max-height:calc(100dvh - 2rem);overflow:hidden;border:1px solid rgba(181,132,75,.7);border-radius:14px;background:linear-gradient(150deg,#25282a,#151719);box-shadow:0 24px 80px rgba(0,0,0,.65);color:#f4efe5}
+.worship-help__header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding:1.1rem 1.25rem;border-bottom:1px solid rgba(181,132,75,.28)}
+.worship-help__header h1,.worship-help__header p{margin:0}.worship-help__header .eyebrow{color:#c99a62}
+.worship-help__body{min-height:0;overflow-y:auto;padding:1.25rem;overscroll-behavior:contain}.worship-help__body h2{margin:0 0 .75rem;color:#d6aa73}.worship-help__body p{line-height:1.58}.worship-help__body ul{padding-left:1.25rem}.worship-help__body li{margin:.45rem 0;line-height:1.5}
+.worship-help__section+.worship-help__section{margin-top:1.4rem;padding-top:1.25rem;border-top:1px solid rgba(255,255,255,.09)}
+.worship-help__progress{font-weight:800;letter-spacing:.12em;color:#d6aa73}.worship-help__footer{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;padding:1rem 1.25rem;border-top:1px solid rgba(181,132,75,.28);background:#191b1d}.worship-help__nav{display:flex;gap:.65rem;flex-wrap:wrap}
+.worship-help__close{min-width:44px;min-height:44px;border:1px solid rgba(255,255,255,.25);border-radius:8px;background:transparent;color:#f4efe5;font-size:1.2rem;cursor:pointer}.worship-help__close:hover,.worship-help__close:focus-visible{border-color:#d6aa73;color:#d6aa73}
+body:has(.worship-help-backdrop){overflow:hidden}
+@media(max-width:600px){.worship-help-backdrop{padding:.5rem}.worship-help{max-height:calc(100dvh - 1rem)}.worship-help__header,.worship-help__body,.worship-help__footer{padding:.9rem}.worship-help__footer{align-items:stretch}.worship-help__footer>button,.worship-help__nav,.worship-help__nav button{flex:1}.worship-help__nav button{min-height:44px}}

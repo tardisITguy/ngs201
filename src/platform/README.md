@@ -378,3 +378,17 @@ versions, canonical `GameState`, Ready, AI, and presence. It remains visible
 through Start, game over, and Return to Lobby. Leaving, being kicked, losing
 membership, or navigating to another room disposes the old subscription so
 subsequent RLS reads and events are unavailable.
+
+## Worship Me! tutorial and rules reference
+
+The game-specific help module supplies an eight-step guided tutorial and the
+detailed How to Play reference used by the landing, lobby, active-game, and
+game-over views. Active play automatically opens the tutorial once per room
+and browser session. Finish and Skip write only a safe per-room
+`sessionStorage` marker; manual **Replay Tutorial** always starts again at step
+one. Storage failures are ignored so they cannot block gameplay.
+
+The help overlay is presentation-only and survives trusted active-game
+repaints. It does not submit commands, pause synchronization, change canonical
+state, or persist any authoritative data. This milestone adds no backend,
+database, Edge Function, RLS, or Realtime behavior.
