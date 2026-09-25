@@ -60,7 +60,7 @@ describe('compact lobby presentation',()=>{
  });
 
  it('places Players and Chat together in a responsive equal-column container',()=>{
-  expect(shellSource).toMatch(/<section class="lobby-content-grid"><div class="panel players-panel">[\s\S]*?<div class="panel chat-panel">/);
+  expect(shellSource).toMatch(/<section class="lobby-content-grid"><div class="panel players-panel">[\s\S]*?\$\{chatPanel\(\)\}/);
   expect(shellCss).toContain('grid-template-columns:minmax(0,1fr) minmax(0,1fr)');
   expect(shellCss).toMatch(/@media\(max-width:700px\)[\s\S]*?\.lobby-content-grid\{grid-template-columns:1fr\}/);
  });

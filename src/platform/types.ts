@@ -125,3 +125,6 @@ export interface LobbyPresenceRequest{roomCode:string}
 export interface LobbyPresenceResult{roomCode:string;completed:true}
 export interface ReturnToLobbyRequest{roomCode:string}
 export interface ReturnToLobbyResult{roomCode:string;status:'lobby';lobbyVersion:number}
+export interface RoomChatMessage{id:string;roomId:string;senderDisplayName:string;messageText:string;createdAt:string}
+export interface SendRoomChatMessageRequest{roomCode:string;messageText:string}
+export type RoomChatSyncStatus='connecting'|'live'|'unavailable';

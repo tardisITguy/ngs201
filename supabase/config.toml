@@ -45,3 +45,6 @@ verify_jwt = true
 
 [functions.lobby-presence]
 verify_jwt = true
+
+[functions.send-chat-message]
+verify_jwt = true

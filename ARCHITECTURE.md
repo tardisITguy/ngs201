@@ -459,3 +459,29 @@ Code-only rooms remain absent from the directory even when named. Naming does
 not touch `room_players.last_seen_at`, so lobby presence stays independent.
 The name is preserved when the game starts and when a finished game returns to
 the lobby for a rematch.
+
+## Persistent room chat
+
+Room chat is an independent, room-scoped stream available to authenticated
+human members while a room is in `lobby` or `active` status:
+
+```text
+browser { roomCode, messageText } -> send-chat-message Edge Function
+  -> verified JWT -> service-only send_room_chat_message_server
+  -> membership/status validation + server-derived display name + rate limit
+  -> room_chat_messages INSERT -> Supabase Realtime INSERT event
+```
+
+Messages contain only intrinsically public chat data: a generated message ID,
+room ID, sender display-name snapshot, plain message text, and server time.
+They never store or publish an Auth user ID, canonical `GameState`, game-state
+version, presence information, or authorization state. RLS permits only current
+room members to read a room's history; browsers cannot insert or mutate rows.
+The private per-user rate-limit table is service-only and is not published.
+
+The browser subscribes before loading the latest 100 rows, buffers and
+deduplicates startup overlap by message ID, and keeps at most 200 messages in
+memory. A connection gap schedules one trusted history catch-up; it does not
+poll. Chat stays mounted across lobby, active play, game over, and Return to
+Lobby, and it is removed immediately when the route or membership is left.
+M9 game-state and M10 lobby-version synchronization remain separate from chat.

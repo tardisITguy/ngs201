@@ -357,3 +357,24 @@ updates lobby-presence timestamps and does not alter Ready state, colors, AI
 configuration, kick records, or join mode. The metadata remains on the room
 through Start, active play, game over, and Return to Lobby; it is not part of
 canonical Worship Me! game state.
+
+## Room chat
+
+The shared room shell mounts one persistent chat coordinator for lobby and
+active/game-over views. Sending uses `{ roomCode, messageText }` only. The Edge
+Function verifies the JWT, derives the user ID, and calls a service-only RPC;
+the database derives the sender's current display name, validates membership
+and room status, applies the one-message-per-second server limit, and inserts
+the safe row.
+
+History is an explicit five-column projection of the newest 100 rows under
+membership RLS. The browser subscribes to room-filtered INSERT events before
+that history read, merges both sources by message ID, orders them by trusted
+server timestamp/ID, and caps memory at 200. Reconnect performs one history
+catch-up and manual **Refresh Chat** remains available; there is no polling.
+
+Chat is deliberately independent of M9 game synchronization, M10 lobby
+versions, canonical `GameState`, Ready, AI, and presence. It remains visible
+through Start, game over, and Return to Lobby. Leaving, being kicked, losing
+membership, or navigating to another room disposes the old subscription so
+subsequent RLS reads and events are unavailable.

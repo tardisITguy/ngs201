@@ -29,3 +29,8 @@ export {createRoomLobbySyncCoordinator,type RoomLobbySyncCallbacks,type RoomLobb
 export {getSupabaseClient} from './supabase/client';
 export {listActiveGames,GamesCatalogError,type CatalogGame} from './games/catalog';
 export {getLobby,LobbyReadError,type AILobbyPlayer,type HumanLobbyPlayer,type Lobby,type LobbyPlayer} from './rooms/lobby';
+export type {RoomChatMessage,RoomChatSyncStatus,SendRoomChatMessageRequest} from './types';
+export {createSendRoomChatMessageAction,sendRoomChatMessage,RoomChatSendError} from './rooms/sendRoomChatMessage';
+export {getRoomChatMessages,ROOM_CHAT_HISTORY_LIMIT} from './rooms/getRoomChatMessages';
+export {subscribeRoomChatMessages,type RoomChatSubscription,type SubscribeRoomChatMessagesOptions} from './rooms/subscribeRoomChatMessages';
+export {createRoomChatSyncCoordinator,ROOM_CHAT_MEMORY_LIMIT,type RoomChatSyncCoordinator} from './rooms/roomChatSync';
