@@ -1,4 +1,5 @@
 import {readFileSync} from 'node:fs';
+import {Window} from 'happy-dom';
 import {describe,expect,it,vi} from 'vitest';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import {getDisplayName,PLAYER_DISPLAY_NAME_KEY,saveIdentity,validateDisplayName} from '../src/platform/identity';
@@ -11,6 +12,29 @@ const session={access_token:'token',user:{id:'host-1'}};
 const auth={getSession:vi.fn().mockResolvedValue({data:{session},error:null})};
 const shellSource=readFileSync(new URL('../src/platform/shell.ts',import.meta.url),'utf8');
 const shellCss=readFileSync(new URL('../src/platform/colorSelection.css',import.meta.url),'utf8');
+
+describe('landing playtest invitation',()=>{
+ it('offers a secondary Discord link after the primary form without routing or submitting',()=>{
+  const landing=shellSource.slice(shellSource.indexOf('function renderIdentity()'),shellSource.indexOf('async function renderGames()'));
+  const invitation=landing.match(/<section class="playtest-community"[\s\S]*?<\/section>/)?.[0];
+  expect(invitation).toBeDefined();
+  const window=new Window();
+  const document=window.document;
+  document.body.innerHTML=invitation!;
+  expect(document.querySelector('h2')?.textContent).toBe('Join the Playtest Community');
+  expect(document.querySelector('p')?.textContent).toBe('Help test our games, share feedback, report bugs, and talk with other players.');
+  const link=document.querySelector('a')!;
+  expect(link.textContent).toBe('Join us on Discord');
+  expect(link.getAttribute('href')).toBe('https://discord.gg/5VxzRwSXVs');
+  expect(link.target).toBe('_blank');
+  expect(link.rel).toBe('noopener noreferrer');
+  expect(link.classList.contains('secondary-button')).toBe(true);
+  expect(link.hasAttribute('data-link')).toBe(false);
+  expect(document.getElementById(link.getAttribute('aria-describedby')!)?.textContent).toBe('Opens in a new tab');
+  expect(landing.indexOf(invitation!)).toBeGreaterThan(landing.indexOf('</form>'));
+  expect(landing).toContain("button('CONTINUE','type=\"submit\"')");
+ });
+});
 
 describe('NGS identity',()=>{
  it('trims, validates, authenticates, and persists only the display name',async()=>{const values=new Map<string,string>(),storage={setItem:(key:string,value:string)=>values.set(key,value),getItem:(key:string)=>values.get(key)??null},ensure=vi.fn().mockResolvedValue({});expect(validateDisplayName('   ')).toMatch(/required/);expect(validateDisplayName('x'.repeat(51))).toMatch(/50/);await expect(saveIdentity('  Test Host  ',storage,ensure)).resolves.toBe('Test Host');expect(ensure).toHaveBeenCalledOnce();expect(values.get(PLAYER_DISPLAY_NAME_KEY)).toBe('Test Host');expect([...values.keys()]).toEqual([PLAYER_DISPLAY_NAME_KEY]);expect(getDisplayName(storage)).toBe('Test Host');});
