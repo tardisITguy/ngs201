@@ -300,8 +300,8 @@ Browser roomCode only -> get-game-state Edge Function -> verified JWT
 ```
 
 **Raw canonical GameState is never sent to the browser.** Canonical state
-contains face-down `hiddenKind`, the setup seed, RNG state, removed tiles, bag
-contents, history, and a seed-bearing event log. The server constructs a new
+contains face-down `hiddenKind`, the setup seed, RNG state, removed tiles,
+history, and a seed-bearing event log. The server constructs a new
 allowlisted DTO rather than shallow-copying and redacting state. Browser roles
 retain no access to `room_states`.
 
@@ -500,3 +500,18 @@ overlay, while Realtime, presence, chat, AI advancement, and gameplay continue
 normally underneath it. No tutorial value enters canonical `GameState`, no
 state version changes, and no database, RPC, Edge Function, RLS, or Realtime
 state is used for help persistence.
+
+
+## Canonical population rules v10
+
+The single shared engine now creates schemaVersion 10. Homes use deterministic integer-ticket birth probabilities and current-round priority derived from canonical `roundFirstPlayerId`, turn order and direction. Normal newborns enter Square subject to capacity; a Bless on a guaranteed birth also attempts a Neutral on the Home. There is no population bag or deferred newborn state. Neutral population is board-only, capped at ten.
+
+End of round: Farm/Bakery production → ordered Home births → Priest creation → fallback Neutral → victory → cleanup/next round. New Priests always move to Square even beyond capacity. Only ordinary own-color Temple Villagers count toward the three-Villager trigger; all on-board ordinary followers and Priests count for final scoring. Fallback adds at most one Neutral when no Home added a pawn, face-down land remains, and Square capacity/Neutral cap permit it.
+
+The public projection remains an allowlist. `roundFirstPlayerId`, RNG, seed, hidden identities and structured history stay server-side. Browser commands and RNG authority are unchanged. Schema-v9 saves and canonical states fail closed without conversion.
+
+Forward migration #23, `20260925000000_canonical_schema_v10.sql`, replaces only schema checks in Start, human/AI CAS commit, and finished-game return RPCs; migrations #1–#22 are immutable. Complete, abandon/reset, or otherwise clear active v9 matches before deploying v10. Frontend, trusted Edge engine and RPC version checks must be released together. Deployment remains prohibited in this implementation task.
+
+Completed v9 matches should be returned to lobby with the v9 stack before rollout: the v10 return RPC also rejects a finished v9 canonical state.
+
+Local deterministic validation: the 100-game, four-player mixed-strategy batch completed 99 games (one cutoff stall), averaging 45.28 rounds versus 29.47 in the recorded v9 batch with the same seeds. An additional 20-game Balanced/Growth two-player batch completed only five games; 15 reached the 150-round cutoff. There were no reducer errors, and Neutral population never exceeded ten. These are balance/AI concerns for external review, not grounds to alter the approved rules. Generated reports are in ignored `validation-results-v10/` and `validation-results-v10-2p/`.

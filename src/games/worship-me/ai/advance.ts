@@ -12,7 +12,7 @@ export type AIAdvanceResult=AIAdvanceDecision|NoAIAdvanceDecision;
 function canonicalState(value:unknown):GameState{
  if(!value||typeof value!=='object'||Array.isArray(value))throw Error('Game state is unavailable');
  const state=value as GameState;
- if(state.schemaVersion!==9||!Array.isArray(state.players)||!Array.isArray(state.turnOrder)||!Number.isInteger(state.currentPlayerIndex))throw Error('Game state is unavailable');
+ if(state.schemaVersion!==10||typeof state.roundFirstPlayerId!=='string'||!Array.isArray(state.turnOrder)||!state.turnOrder.includes(state.roundFirstPlayerId)||!Array.isArray(state.players)||!Number.isInteger(state.currentPlayerIndex))throw Error('Game state is unavailable');
  return state;
 }
 

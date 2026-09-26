@@ -86,6 +86,7 @@ describe('Lobby lifecycle migration',()=>{
    '20260924000003_lobby_presence_and_stale_directory.sql',
    '20260924000004_room_naming.sql',
    '20260924000005_room_chat.sql',
+   '20260925000000_canonical_schema_v10.sql',
   ]);
  });
 

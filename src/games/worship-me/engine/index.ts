@@ -19,7 +19,7 @@ export {getLegalActions,actionIsSmite,actionKey} from './legalActions';
 export {validatePlacement,placementUnavailableReason} from './placementLegality';
 export {serializeGame,deserializeGame} from './serialization';
 export {exportPlayByPlay,playByPlayFilename} from './history';
-export {checkVictory,allVillageTilesFaceUp,followerTotal,followersInOwnTemple} from './victory';
+export {checkVictory,allVillageTilesFaceUp,followerTotal,ordinaryVillagersInOwnTemple} from './victory';
 export type {
   BotStrategy,
   GameAction,

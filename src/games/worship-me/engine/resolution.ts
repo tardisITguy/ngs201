@@ -32,8 +32,8 @@ export function blessEdgeOptions(s:GameState,a:BlessEdgePlacement):MoveResolutio
 export function applyBlessEdgeChoice(s:GameState,a:BlessEdgePlacement,o:MoveResolutionOption){
  const from=findCell(s.board,o.from),to=findCell(s.board,o.to),p=s.players.find(v=>v.id===a.playerId)!;
  if(o.resourceOnly){const r=o.resource!;from[r]--;to[r]++;return}
- if(o.neutral){from.villagers.splice(from.villagers.indexOf('neutral'),1);to.villagers.push(p.color);s.newVillagerBag.push('neutral');return}
- if(o.opponent){const color=o.moverColor!,index=from.villagers.indexOf(color);if(index<0)throw Error('Opponent pawn is no longer available');from.villagers.splice(index,1);if(countNeutralsInPlay(s)<MAX_NEUTRALS_IN_PLAY){to.villagers.push('neutral');s.newVillagerBag.push(color)}else to.villagers.push(color);return}
+ if(o.neutral){from.villagers.splice(from.villagers.indexOf('neutral'),1);to.villagers.push(p.color);return}
+ if(o.opponent){const color=o.moverColor!,index=from.villagers.indexOf(color);if(index<0)throw Error('Opponent pawn is no longer available');from.villagers.splice(index,1);if(countNeutralsInPlay(s)<MAX_NEUTRALS_IN_PLAY){to.villagers.push('neutral');}else to.villagers.push(color);return}
  const list=o.moverRole==='priest'?from.priests:from.villagers,index=list.indexOf(p.color);if(index<0)throw Error('Own pawn is no longer available');list.splice(index,1);(o.moverRole==='priest'?to.priests:to.villagers).push(p.color);if(o.resource){from[o.resource]--;to[o.resource]++}
 }
 

@@ -25,7 +25,7 @@ export function parseWorshipMeBrowserCommand(value:unknown):WorshipMeBrowserComm
 }
 
 function canonicalState(value:unknown):GameState{
- if(!record(value)||value.schemaVersion!==9||!Array.isArray(value.players)||!Array.isArray(value.turnOrder)||!Array.isArray(value.board)||!Number.isInteger(value.currentPlayerIndex))throw Error('Game state is unavailable');
+ if(!record(value)||value.schemaVersion!==10||!Array.isArray(value.players)||!Array.isArray(value.turnOrder)||!Array.isArray(value.board)||typeof value.roundFirstPlayerId!=='string'||!value.turnOrder.includes(value.roundFirstPlayerId)||!Number.isInteger(value.currentPlayerIndex))throw Error('Game state is unavailable');
  return value as unknown as GameState;
 }
 

@@ -6,12 +6,12 @@ export interface WorshipMePublicQueuedAction{sequence:number;placement:Placement
 export type WorshipMePublicPendingDecision=
  |{type:'blessEdgeMove';playerId:string;options:Array<{from:string;to:string;moverRole?:'ordinary'|'priest';moverColor?:VillagerColor;resource?:'wheat'|'bread';resourceOnly?:boolean;neutral?:boolean;opponent?:boolean}>}
  |{type:'smiteResource';playerId:string;cellId:string;options:Array<'wheat'|'bread'>};
-export interface WorshipMePublicGameView{schemaVersion:9;round:number;phase:Phase;direction:1|-1;currentPlayerId:string;players:WorshipMePublicPlayer[];board:WorshipMePublicCell[];edgeMarkers:EdgeMarker[];actionQueue:WorshipMePublicQueuedAction[];resolutionIndex:number;tileClaims:Record<string,Modifier>;pendingDecision?:WorshipMePublicPendingDecision;winnerId?:string}
+export interface WorshipMePublicGameView{schemaVersion:10;round:number;phase:Phase;direction:1|-1;currentPlayerId:string;players:WorshipMePublicPlayer[];board:WorshipMePublicCell[];edgeMarkers:EdgeMarker[];actionQueue:WorshipMePublicQueuedAction[];resolutionIndex:number;tileClaims:Record<string,Modifier>;pendingDecision?:WorshipMePublicPendingDecision;winnerId?:string}
 
 const playerColors=new Set(['red','purple','blue','cyan','green','yellow','orange','black']);
 const villagerColors=new Set([...playerColors,'neutral']);
 const tileKinds=new Set(['hidden','farm','bakery','home','square','temple']);
-const phases=new Set(['placement','resolution','production','homeBirths','bagDraw','endRound','victory','gameOver']);
+const phases=new Set(['placement','resolution','production','homeBirths','endRound','victory','gameOver']);
 const record=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value);
 const text=(value:unknown,label:string)=>{if(typeof value!=='string'||!value)throw Error(`Invalid ${label}`);return value};
 const integer=(value:unknown,label:string)=>{if(!Number.isInteger(value))throw Error(`Invalid ${label}`);return value as number};
@@ -26,7 +26,7 @@ function pendingDecision(value:unknown):WorshipMePublicPendingDecision|undefined
 }
 
 export function buildWorshipMePublicGameView(value:unknown):WorshipMePublicGameView{
- if(!record(value)||value.schemaVersion!==9||!Array.isArray(value.players)||!Array.isArray(value.turnOrder)||!Array.isArray(value.board)||value.board.length!==25||!Array.isArray(value.edgeMarkers)||!Array.isArray(value.actionQueue)||!record(value.tileClaims))throw Error('Invalid canonical game state');
+ if(!record(value)||value.schemaVersion!==10||!Array.isArray(value.players)||!Array.isArray(value.turnOrder)||!Array.isArray(value.board)||value.board.length!==25||!Array.isArray(value.edgeMarkers)||!Array.isArray(value.actionQueue)||!record(value.tileClaims))throw Error('Invalid canonical game state');
  const round=integer(value.round,'round'),currentPlayerIndex=integer(value.currentPlayerIndex,'current player index'),resolutionIndex=integer(value.resolutionIndex,'resolution index');
  if(round<1||currentPlayerIndex<0||currentPlayerIndex>=value.turnOrder.length||resolutionIndex<0||!phases.has(value.phase as string)||(value.direction!==1&&value.direction!==-1))throw Error('Invalid canonical game state');
  const canonicalPlayers=new Map(value.players.map(raw=>{if(!record(raw)||!playerColors.has(raw.color as string)||(raw.control!=='human'&&raw.control!=='ai'))throw Error('Invalid player');const player:WorshipMePublicPlayer={id:text(raw.id,'player id'),name:text(raw.name,'player name'),color:raw.color as PlayerColor,templeCellId:text(raw.templeCellId,'temple cell'),priestsCreated:integer(raw.priestsCreated,'priest count'),control:raw.control};return[player.id,player] as const}));
@@ -37,7 +37,7 @@ export function buildWorshipMePublicGameView(value:unknown):WorshipMePublicGameV
  const edgeMarkers=value.edgeMarkers.map(raw=>{if(!record(raw)||typeof raw.a!=='string'||typeof raw.b!=='string'||typeof raw.playerId!=='string'||(raw.kind!=='bless'&&raw.kind!=='smite'))throw Error('Invalid edge marker');return{a:raw.a,b:raw.b,playerId:raw.playerId,kind:raw.kind} as EdgeMarker});
  const actionQueue=value.actionQueue.map(raw=>{if(!record(raw))throw Error('Invalid queued action');return{sequence:integer(raw.sequence,'action sequence'),placement:placement(raw.placement)}});
  const tileClaims=Object.fromEntries(Object.entries(value.tileClaims).map(([id,raw])=>{const claim=modifier(raw);if(!claim)throw Error('Invalid tile claim');return[id,claim]}));
- const publicView:WorshipMePublicGameView={schemaVersion:9,round,phase:value.phase as Phase,direction:value.direction,currentPlayerId,players,board,edgeMarkers,actionQueue,resolutionIndex,tileClaims};
+ const publicView:WorshipMePublicGameView={schemaVersion:10,round,phase:value.phase as Phase,direction:value.direction,currentPlayerId,players,board,edgeMarkers,actionQueue,resolutionIndex,tileClaims};
  const pending=pendingDecision(value.pendingResolution);if(pending){const boardIds=new Set(board.map(cell=>cell.id));if(!canonicalPlayers.has(pending.playerId)||pending.options.length===0||(pending.type==='blessEdgeMove'&&pending.options.some(option=>!boardIds.has(option.from)||!boardIds.has(option.to)))||(pending.type==='smiteResource'&&!boardIds.has(pending.cellId)))throw Error('Invalid canonical game state');publicView.pendingDecision=pending;}
  if(value.winnerId!==undefined){if(typeof value.winnerId!=='string'||!canonicalPlayers.has(value.winnerId))throw Error('Invalid canonical game state');publicView.winnerId=value.winnerId;}
  return publicView;

@@ -1,23 +1,23 @@
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {simulateBatch,simulateGame,type SimulationResult} from './simulate';
-import {createGame} from '../engine/setup';
-import {checkVictory} from '../engine/victory';
-import {exportPlayByPlay,recordHistory,victorySnapshot} from '../engine/history';
+import {createVictoryRegression} from './validationVictory';
+import {exportPlayByPlay} from '../engine/history';
 import type {BotStrategy} from '../engine/types';
 
 const args=process.argv.slice(2),value=(name:string,fallback:string)=>{const i=args.indexOf(`--${name}`);return i<0?fallback:args[i+1]},pool:BotStrategy[]=['balanced','growth','templeRush','random'];
 const games=Number(value('games','100')),count=Number(value('players','4')),players=Array.from({length:count},(_,i)=>pool[i%pool.length]),outputDir=value('output-dir','validation-results'),seedPrefix=value('seed','validation');
 mkdirSync(outputDir,{recursive:true});
-const regression=createGame(2,'seed-2-victory-regression',{randomizeFirstPlayer:false,randomizeDirection:false});for(const c of regression.board){c.villagers=[];c.priests=[];if(c.visibleKind==='hidden')c.visibleKind=c.hiddenKind!}const red=regression.players[0],purple=regression.players[1],redTemple=regression.board.find(c=>c.id===red.templeCellId)!,purpleTemple=regression.board.find(c=>c.id===purple.templeCellId)!;redTemple.villagers.push(red.color,red.color,red.color);purpleTemple.villagers.push(purple.color);regression.board.find(c=>c.visibleKind==='square')!.villagers.push(red.color);let purpleRemaining=9;for(const c of regression.board.filter(c=>c.visibleKind!=='temple'&&c.visibleKind!=='square'))while(purpleRemaining&&c.villagers.length<4){c.villagers.push(purple.color);purpleRemaining--}const regressionVictory=checkVictory(regression);regression.winnerId=regressionVictory.winnerId;regression.phase='gameOver';recordHistory(regression,'victoryCheck','Red reached 3 followers in its Temple, triggering the end of the game. Purple wins with 10 total followers.',{allVillageTilesRevealed:true,templeTriggerSatisfied:true,gameEndTriggered:true,triggeringPlayerIds:regressionVictory.triggeringPlayerIds,followerTotals:regressionVictory.followerTotals,highestFollowerTotal:regressionVictory.highestFollowerTotal,winnerId:regressionVictory.winnerId,result:regressionVictory,players:victorySnapshot(regression)},{id:'REGRESSION-VICTORY-SEED-2'});writeFileSync(join(outputDir,'regression-red-trigger-purple-wins.json'),JSON.stringify(exportPlayByPlay(regression),null,2));
+const regression=createVictoryRegression();
+writeFileSync(join(outputDir,'regression-red-trigger-purple-wins.json'),JSON.stringify(exportPlayByPlay(regression),null,2));
 const visibleCounts=[2,3,4,6,8],visible=visibleCounts.map(n=>simulateGame({seed:`${seedPrefix}-visible-${n}p`,players:Array.from({length:n},(_,i)=>pool[i%pool.length]),maxRounds:150,maxActions:5000,trace:true})),knownStall=simulateGame({seed:'five-test-2p-batch-0',players:['balanced','growth'],maxRounds:150,maxActions:5000,trace:true});
 const report=simulateBatch({games,players,seedPrefix:`${seedPrefix}-batch`,maxRounds:Number(value('max-rounds','150')),maxActions:Number(value('max-actions','5000')),trace:true});
 function filename(r:SimulationResult,label:string){return `${label}-seed-${r.seed.replace(/[^a-z0-9_-]+/gi,'_')}.json`}
-function artifact(r:SimulationResult){return{format:'worship-me-validation-play-by-play',schemaVersion:9,simulation:{...r,history:undefined},history:r.history}}
+function artifact(r:SimulationResult){return{format:'worship-me-validation-play-by-play',schemaVersion:10,simulation:{...r,history:undefined},history:r.history}}
 for(const [i,r] of visible.entries())writeFileSync(join(outputDir,filename(r,`visible-${visibleCounts[i]}p`)),JSON.stringify(artifact(r),null,2));
 writeFileSync(join(outputDir,'known-stall-replay.json'),JSON.stringify(artifact(knownStall),null,2));
 for(const [i,r] of report.results.entries())writeFileSync(join(outputDir,filename(r,`game-${String(i+1).padStart(3,'0')}`)),JSON.stringify(artifact(r),null,2));
-const summary={generatedAt:new Date().toISOString(),knownStallReplay:{...knownStall,history:undefined},visibleGames:visible.map(r=>({...r,history:undefined})),batch:{...report,results:report.results.map(r=>({...r,history:undefined}))}};
+const summary={schemaVersion:10,generatedAt:new Date().toISOString(),knownStallReplay:{...knownStall,history:undefined},visibleGames:visible.map(r=>({...r,history:undefined})),batch:{...report,results:report.results.map(r=>({...r,history:undefined}))}};
 writeFileSync(join(outputDir,'run-summary.json'),JSON.stringify(summary,null,2));
 const notable=(r:SimulationResult)=>({seed:r.seed,rounds:r.rounds,file:filename(r,`game-${String(report.results.indexOf(r)+1).padStart(3,'0')}`)}),by=(fn:(r:SimulationResult)=>number,dir:1|-1=1)=>[...report.results].sort((a,b)=>(fn(a)-fn(b))*dir)[0];
 const strategyWinners=Object.fromEntries(pool.map(strategy=>{const r=report.results.find(x=>x.winnerStrategy===strategy);return[strategy,r?notable(r):null]}));
