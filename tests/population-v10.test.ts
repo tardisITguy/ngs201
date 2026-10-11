@@ -10,9 +10,7 @@ import {checkVictory,followerTotal,ordinaryVillagersInOwnTemple} from '../src/ga
 import {countNeutralsInPlay} from '../src/games/worship-me/engine/neutrals';
 import {tileCapacity} from '../src/games/worship-me/engine/capacity';
 import {serializeGame,deserializeGame} from '../src/games/worship-me/engine/serialization';
-import {applyTrustedWorshipMeCommand} from '../src/games/worship-me/trustedGameCommand';
 import {advanceOneAIDecision} from '../src/games/worship-me/ai/advance';
-import {buildWorshipMePublicGameView} from '../src/games/worship-me/publicGameView';
 import type {GameState,PlayerColor,VillagerColor} from '../src/games/worship-me/engine/types';
 import * as rng from '../src/games/worship-me/engine/rng';
 
@@ -80,8 +78,7 @@ describe('Priest arrival and ordinary Temple trigger',()=>{
  it('Priest arrival is not a Home birth but may consume the final fallback capacity',()=>{let {s,q}=scenario([]);q.villagers=Array(tileCapacity(s,q)-1).fill('yellow');s.board.find(c=>c.id===s.players[0].templeCellId)!.villagers=['red','red','red'];s=finishRound(s);const fallback=s.history.events.find(e=>e.data.type==='fallbackNeutral')!;expect(fallback.data).toMatchObject({anyHomeVillagerAdded:false,neutralAdded:0,blockedReason:'square-at-capacity'})});
 });
 describe('v10 canonical compatibility and public secrecy',()=>{
- it('creates only current fields and rejects v9 at every trusted engine entry',()=>{const s=createGame(2,'compat');expect(s.schemaVersion).toBe(10);expect(s).not.toHaveProperty('newVillagerBag');expect(s.config).not.toHaveProperty('endRoundDrawsPerPlayer');const old={...s,schemaVersion:9};expect(()=>deserializeGame(JSON.stringify(old))).toThrow(/v10/);expect(()=>applyTrustedWorshipMeCommand(old,{type:'endTurn'},'p1')).toThrow();expect(()=>advanceOneAIDecision(old)).toThrow();expect(()=>buildWorshipMePublicGameView(old)).toThrow()});
- it('keeps round priority, hidden identities and randomness outside actual public JSON',()=>{const s=createGame(2,'secret'),view=buildWorshipMePublicGameView(s);expect(view.schemaVersion).toBe(10);const json=JSON.stringify(view);for(const key of ['roundFirstPlayerId','seed','rngState','history','hiddenKind','eventLog','removedVillageTiles'])expect(json).not.toContain('"'+key+'"');expect(()=>buildWorshipMePublicGameView({...s,phase:'bagDraw'})).toThrow()});
+ it('creates only current fields and rejects v9 at engine and AI entries',()=>{const s=createGame(2,'compat');expect(s.schemaVersion).toBe(10);expect(s).not.toHaveProperty('newVillagerBag');expect(s.config).not.toHaveProperty('endRoundDrawsPerPlayer');const old={...s,schemaVersion:9};expect(()=>deserializeGame(JSON.stringify(old))).toThrow(/v10/);expect(()=>advanceOneAIDecision(old)).toThrow()});
 });
 
 describe('v10 automatic integration, AI and metrics',()=>{

@@ -12,6 +12,15 @@ export const weights:Record<Exclude<BotStrategy,'random'>,StrategyWeights>={
  balanced:{populationGrowth:7,resourceEconomy:7,templeProgress:8,templePreservation:9,priestProgress:6,productionEnhancement:7,opponentDisruption:6,mobility:5,exploration:5}
 };
 export interface Scored{score:number;components:ScoreComponents}
+export type BlessEdgeMoverKind='ownOrdinary'|'ownPriest'|'neutral'|'opponentOrdinary'|'resourceOnly';
+export function classifyBlessEdgeMover(o:MoveResolutionOption,actingColor:Player['color']):BlessEdgeMoverKind{
+ if(o.resourceOnly)return'resourceOnly';
+ if(!o.moverRole||!o.moverColor)throw Error('Invalid Bless Edge movement option');
+ if(o.moverColor==='neutral')return'neutral';
+ if(o.moverColor===actingColor)return o.moverRole==='priest'?'ownPriest':'ownOrdinary';
+ if(o.moverRole==='ordinary')return'opponentOrdinary';
+ throw Error('Unsupported opponent Priest movement option');
+}
 const blank=():ScoreComponents=>({base:0,templeProgress:0,templePreservation:0,endTriggerValue:0,resourceValue:0,productionValue:0,populationGrowth:0,priestValue:0,disruption:0,exploration:0,mobility:0,resourceRemovalValue:0,productionPreventedValue:0,strategicDisruptionValue:0,squareCongestionValue:0,terminalPressure:0,resourceSaturationPenalty:0,stagnationPenalty:0,reversalPenalty:0,riskPenalty:0});
 const total=(c:ScoreComponents)=>Object.values(c).reduce((a,b)=>a+b,0);
 const playerFor=(s:GameState,id:string)=>s.players.find(p=>p.id===id)!;
@@ -22,26 +31,36 @@ export function templeState(s:GameState,p:Player){const temple=templeCell(s,p),o
 function distance(a:Cell,b:Cell){return Math.abs(a.row-b.row)+Math.abs(a.col-b.col)}
 function productiveHome(c:Cell){return c.visibleKind==='home'&&occupancy(c)===2&&c.bread>0&&c.tileModifier?.kind!=='smite'&&priestHomeCompatible(c)}
 function recentReversal(s:GameState,p:Player,o:MoveResolutionOption){return s.history.events.slice(-40).reverse().some(e=>e.type==='resolutionDecision'&&e.playerId===p.id&&(()=>{const d=e.data.decision as MoveResolutionOption|undefined;return !!d&&d.from===o.to&&d.to===o.from&&d.resource===o.resource})())}
+// Preserve first/urgent defense, but share repeated-denial saturation by target Temple.
+export function recentTargetTempleDisruptions(s:GameState,owner:Player){
+ return s.history.events.filter(e=>e.type==='resolutionDecision'&&e.round>=s.round-6&&e.playerId!==owner.id&&(()=>{const d=e.data.decision as MoveResolutionOption|undefined;return !!d&&d.opponent===true&&d.moverRole==='ordinary'&&d.moverColor===owner.color&&d.from===owner.templeCellId})()).length;
+}
+export function opponentTempleDisruptionMultiplier(s:GameState,o:MoveResolutionOption,owner:Player){
+ const from=s.board.find(c=>c.id===o.from);if(from?.visibleKind!=='temple'||from.templeOwnerId!==owner.id)return 1;
+ const threat=templeState(s,owner);if(threat.followers>=s.config.templeTriggerFollowers)return 1;
+ const recent=recentTargetTempleDisruptions(s,owner);
+ return recent===0?1:recent===1 ? .5:recent===2?1/3:.25;
+}
 function revealRound(s:GameState){return s.history.events.find(e=>e.type==='victoryCheck'&&e.data.allVillageTilesRevealed===true)?.round}
 function stagnantRounds(s:GameState,p:Player){const checks=s.history.events.filter(e=>e.type==='victoryCheck').slice(-30).reverse();if(!checks.length)return 0;const latest=(checks[0].data.players as Array<{playerId:string;followers:number;templeFollowers:number}>).find(x=>x.playerId===p.id);let count=0;for(const e of checks){const x=(e.data.players as Array<{playerId:string;followers:number;templeFollowers:number}>).find(v=>v.playerId===p.id);if(!x||!latest||x.followers!==latest.followers||x.templeFollowers!==latest.templeFollowers)break;count++}return count}
 function congestion(s:GameState,p:Player){const square=s.board.find(c=>c.visibleKind==='square')!;return{square,openSlots:remainingCapacity(s,square),stagnant:stagnantRounds(s,p)}}
 
 export function scoreResolutionOption(s:GameState,playerId:string,o:MoveResolutionOption,w:StrategyWeights):Scored{
- const c=blank(),p=playerFor(s,playerId),from=s.board.find(x=>x.id===o.from)!,to=s.board.find(x=>x.id===o.to)!,temple=templeCell(s,p),ts=templeState(s,p),movesOwn=!!o.moverRole,opponentLeader=Math.max(...s.players.filter(x=>x.id!==p.id).map(x=>totalFollowers(s,x))),cong=congestion(s,p);
+ const c=blank(),p=playerFor(s,playerId),from=s.board.find(x=>x.id===o.from)!,to=s.board.find(x=>x.id===o.to)!,temple=templeCell(s,p),ts=templeState(s,p),moverKind=classifyBlessEdgeMover(o,p.color),movesOwn=moverKind==='ownOrdinary'||moverKind==='ownPriest',opponentLeader=Math.max(...s.players.filter(x=>x.id!==p.id).map(x=>totalFollowers(s,x))),cong=congestion(s,p);
  c.base=1;c.mobility=w.mobility;
- if(movesOwn&&o.moverRole!=='priest'){const before=distance(from,temple),after=distance(to,temple);c.templeProgress+=(before-after)*w.templeProgress*2;if(to.id===temple.id){c.templeProgress+=w.templeProgress*(ts.followers===2?5:ts.followers===1?4:2);if(ts.followers===ts.triggerTarget-1){if(ts.allLandRevealed)c.endTriggerValue+=(ts.totalFollowers>opponentLeader?w.templeProgress*14:ts.totalFollowers<opponentLeader?-w.templeProgress*18:-w.templeProgress*5);else c.endTriggerValue+=w.templeProgress*4}}if(from.id===temple.id){const favorableEnd=ts.allLandRevealed&&ts.triggerReady&&ts.totalFollowers>opponentLeader,severe=(ts.followers<=2)||(ts.followers===3&&favorableEnd);c.templePreservation-=w.templePreservation*(severe?8:ts.followers===3&&ts.totalFollowers<opponentLeader?-1:3)}
+ if(moverKind==='ownOrdinary'){const before=distance(from,temple),after=distance(to,temple);c.templeProgress+=(before-after)*w.templeProgress*2;if(to.id===temple.id){c.templeProgress+=w.templeProgress*(ts.followers===2?5:ts.followers===1?4:2);if(ts.followers===ts.triggerTarget-1){if(ts.allLandRevealed)c.endTriggerValue+=(ts.totalFollowers>opponentLeader?w.templeProgress*14:ts.totalFollowers<opponentLeader?-w.templeProgress*18:-w.templeProgress*5);else c.endTriggerValue+=w.templeProgress*4}}if(from.id===temple.id){const favorableEnd=ts.allLandRevealed&&ts.triggerReady&&ts.totalFollowers>opponentLeader,severe=(ts.followers<=2)||(ts.followers===3&&favorableEnd);c.templePreservation-=w.templePreservation*(severe?8:ts.followers===3&&ts.totalFollowers<opponentLeader?-1:3)}
   if(productiveHome(from)){c.populationGrowth-=w.populationGrowth*9;c.productionValue-=w.productionEnhancement*5}if(to.visibleKind==='home'){const afterOccupancy=occupancy(to)+1;if(afterOccupancy===2&&to.bread&&priestHomeCompatible({...to,villagers:[...to.villagers,p.color]}))c.populationGrowth+=w.populationGrowth*7;else if(afterOccupancy===3)c.populationGrowth-=w.populationGrowth*12}
   if(['farm','bakery','home'].includes(to.visibleKind))c.productionValue+=w.productionEnhancement*1.5;
- }else if(o.neutral){c.populationGrowth+=w.populationGrowth*3;c.mobility+=w.mobility*2;const before=distance(from,temple),after=distance(to,temple);c.templeProgress+=(before-after)*w.templeProgress}
- else if(o.opponent){const owner=s.players.find(x=>x.color===o.moverColor);c.disruption+=w.opponentDisruption*((from.visibleKind==='temple'&&owner?.templeCellId===from.id)?8:(productiveHome(from)?7:2));if(to.visibleKind==='temple'&&owner?.templeCellId===to.id)c.disruption-=w.opponentDisruption*8}
+ }else if(moverKind==='neutral'){c.populationGrowth+=w.populationGrowth*3;c.mobility+=w.mobility*2;const before=distance(from,temple),after=distance(to,temple);c.templeProgress+=(before-after)*w.templeProgress}
+ else if(moverKind==='opponentOrdinary'){const owner=s.players.find(x=>x.color===o.moverColor),templeOrigin=from.visibleKind==='temple'&&owner?.templeCellId===from.id;c.disruption+=w.opponentDisruption*(templeOrigin?8*opponentTempleDisruptionMultiplier(s,o,owner):(productiveHome(from)?7:2));if(to.visibleKind==='temple'&&owner?.templeCellId===to.id)c.disruption-=w.opponentDisruption*8}
  if(o.resource==='wheat'){if(to.visibleKind==='bakery'){c.resourceValue+=w.resourceEconomy*7;c.productionValue+=to.wheat<1?w.productionEnhancement*4:w.productionEnhancement*2}if(from.visibleKind==='bakery'){c.resourceValue-=w.resourceEconomy*5}if(['temple','home','farm'].includes(to.visibleKind))c.resourceValue-=w.resourceEconomy*2}
  if(o.resource==='bread'){if(to.visibleKind==='home'){c.resourceValue+=w.resourceEconomy*(occupancy(to)===2?9:5);if(occupancy(to)===2&&priestHomeCompatible(to))c.populationGrowth+=w.populationGrowth*7}if(from.visibleKind==='home'){c.resourceValue-=w.resourceEconomy*(occupancy(from)===2?8:4)}if(['temple','farm','bakery'].includes(to.visibleKind))c.resourceValue-=w.resourceEconomy*2}
  if(from.visibleKind==='square'&&cong.openSlots===0&&!o.resourceOnly){const productive=s.board.some(productiveHome),fallback=s.board.some(cell=>cell.visibleKind==='hidden');if(productive||fallback)c.squareCongestionValue+=w.mobility*4+w.populationGrowth*2}
  if(cong.openSlots===0&&o.resource==='bread'&&to.visibleKind==='home'){c.resourceSaturationPenalty-=w.populationGrowth*3;c.stagnationPenalty-=w.resourceEconomy*Math.min(5,cong.stagnant/4)}
  if(o.resource==='wheat'&&to.visibleKind==='bakery'&&to.wheat>=Math.max(2,occupancy(to)*2))c.resourceSaturationPenalty-=w.resourceEconomy*Math.min(5,to.wheat/2);
  if(recentReversal(s,p,o))c.reversalPenalty-=Math.max(w.templeProgress,w.resourceEconomy,w.mobility)*5;
- if(o.moverRole==='priest'){if(to.visibleKind==='farm'||to.visibleKind==='bakery')c.priestValue+=w.priestProgress*4;if(from.visibleKind==='farm'||from.visibleKind==='bakery')c.priestValue-=w.priestProgress*3}
- if(ts.allLandRevealed&&!ts.triggerReady){const toward=movesOwn&&o.moverRole!=='priest'&&distance(to,temple)<distance(from,temple),sinceReveal=Math.max(0,s.round-(revealRound(s)??s.round)),leading=ts.totalFollowers>opponentLeader;if(toward){const maturity=Math.min(12,Math.floor(sinceReveal/5))+Math.min(8,Math.floor(cong.stagnant/3));c.terminalPressure+=w.templeProgress*(leading?19+maturity:2+Math.floor(maturity/2));if(to.id===temple.id)c.terminalPressure+=w.templeProgress*(leading?12:3)}c.templeProgress*=1.4;if(movesOwn&&to.id!==temple.id&&distance(to,temple)>=distance(from,temple)&&leading)c.riskPenalty-=w.templeProgress*5}
+ if(moverKind==='ownPriest'){if(to.visibleKind==='farm'||to.visibleKind==='bakery')c.priestValue+=w.priestProgress*4;if(from.visibleKind==='farm'||from.visibleKind==='bakery')c.priestValue-=w.priestProgress*3}
+ if(ts.allLandRevealed&&!ts.triggerReady){const toward=moverKind==='ownOrdinary'&&distance(to,temple)<distance(from,temple),sinceReveal=Math.max(0,s.round-(revealRound(s)??s.round)),leading=ts.totalFollowers>opponentLeader;if(toward){const maturity=Math.min(12,Math.floor(sinceReveal/5))+Math.min(8,Math.floor(cong.stagnant/3));c.terminalPressure+=w.templeProgress*(leading?19+maturity:2+Math.floor(maturity/2));if(to.id===temple.id)c.terminalPressure+=w.templeProgress*(leading?12:3)}c.templeProgress*=1.4;if(movesOwn&&to.id!==temple.id&&distance(to,temple)>=distance(from,temple)&&leading)c.riskPenalty-=w.templeProgress*5}
  return{components:c,score:total(c)};
 }
 
