@@ -9,9 +9,9 @@ describe('board action-token overlays',()=>{
 
  it('renders owned Bless and Smite tile artwork on the targeted tile',()=>{
   let blessed=game(),red=player(blessed);blessed=applyAction(blessed,{type:'placeTile',cellId:'1,1',kind:'bless',playerId:red.id});const blessHtml=renderBoard(blessed);
-  expect(blessHtml).toContain('aria-label="Red (Player 1) Bless on hidden 1,1; pending"');expect(blessHtml).toContain('data-action-kind="bless" data-coordinate="1,1"');expect(blessHtml).toContain('/assets/bless-token.svg');
+  expect(blessHtml).toContain('aria-label="Red (Player 1) Bless on hidden 1,1; pending"');expect(blessHtml).toContain('data-action-kind="bless" data-coordinate="1,1"');expect(blessHtml).toContain('/games/worship-me/assets/bless-token.svg');
   let smited=game();red=player(smited);reveal(smited,'1,1');smited=applyAction(smited,{type:'placeTile',cellId:'1,1',kind:'smite',playerId:red.id});const smiteHtml=renderBoard(smited);
-  expect(smiteHtml).toContain('aria-label="Red (Player 1) Smite on farm 1,1; pending"');expect(smiteHtml).toContain('data-action-kind="smite" data-coordinate="1,1"');expect(smiteHtml).toContain('/assets/smite-token.svg');
+  expect(smiteHtml).toContain('aria-label="Red (Player 1) Smite on farm 1,1; pending"');expect(smiteHtml).toContain('data-action-kind="smite" data-coordinate="1,1"');expect(smiteHtml).toContain('/games/worship-me/assets/smite-token.svg');
  });
 
  it('uses one physical border while preserving directed Bless Edge arrows',()=>{
